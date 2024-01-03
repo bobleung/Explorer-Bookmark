@@ -6,6 +6,11 @@ import { buildTypedDirectory } from "../types/TypedDirectory";
 
 export class DirectoryWorker
 {
+    readonly vsCodeExtensionConfigurationKey: string = "explorer-bookmark";
+    readonly saveWorkspaceConfigurationSettingKey: string = "saveWorkspace";
+    readonly storedBookmarksContextKey: string = "storedBookmarks";
+    readonly bookmarkedDirectoryContextValue: string = "directlyBookmarkedDirectory";
+
     private bookmarkedDirectories: TypedDirectory[] = [];
     private saveWorkspaceSetting: boolean | undefined = false;
 
@@ -36,7 +41,7 @@ export class DirectoryWorker
         {
             this.bookmarkedDirectories.push(await buildTypedDirectory(uri));
         }
-        this.saveWorkspace();
+        this.saveBookmarks();
     }
 
     async removeItem(uri: vscode.Uri | undefined)
@@ -52,13 +57,13 @@ export class DirectoryWorker
                 this.bookmarkedDirectories.splice(index, 1);
             }
         }
-        this.saveWorkspace();
+        this.saveBookmarks();
     }
 
     private async directorySearch(uri: vscode.Uri)
     {
-        const folders = await vscode.workspace.fs.readDirectory(uri);
-        return folders
+        const entries = await vscode.workspace.fs.readDirectory(uri);
+        return entries
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map((item) =>
             {
@@ -71,60 +76,60 @@ export class DirectoryWorker
                 return new FileSystemObject(
                     name,
                     isDirectory,
-                    vscode.Uri.file(uri.path + "/" + name)
+                    vscode.Uri.file(`${uri.path}/${name}`)
                 );
             });
     }
 
-    private async createEntries(selectedFSObjects: TypedDirectory[])
+    private async createEntries(bookmarkedDirectories: TypedDirectory[])
     {
-        let folderSystem: FileSystemObject[] = [];
+        let fileSystem: FileSystemObject[] = [];
 
-        for (const fsItem of selectedFSObjects)
+        for (const dir of bookmarkedDirectories)
         {
-            const { path: filePath, type: type } = fsItem;
+            const { path: filePath, type: type } = dir;
             const file = vscode.Uri.file(filePath);
 
-            folderSystem.push(
+            fileSystem.push(
                 new FileSystemObject(
-                    `${path.basename(fsItem.path)}`,
+                    `${path.basename(dir.path)}`,
                     type === vscode.FileType.File
                         ? vscode.TreeItemCollapsibleState.None
                         : vscode.TreeItemCollapsibleState.Collapsed,
                     file
-                ).setContextValue("directlySavedItem")
+                ).setContextValue(this.bookmarkedDirectoryContextValue)
             );
         }
 
-        return folderSystem;
+        return fileSystem;
     }
 
     private hydrateState(): void
     {
         this.saveWorkspaceSetting = vscode.workspace
-            .getConfiguration("explorer-bookmark")
-            .get("saveWorkspace");
+            .getConfiguration(this.saveWorkspaceConfigurationSettingKey)
+            .get(this.saveWorkspaceConfigurationSettingKey);
         this.bookmarkedDirectories =
             (this.workspaceRoot
-                ? this.extensionContext.workspaceState.get("savedWorkspaceItems")
-                : this.extensionContext.globalState.get("savedWorkspaceItems")) || [];
+                ? this.extensionContext.workspaceState.get(this.storedBookmarksContextKey)
+                : this.extensionContext.globalState.get(this.storedBookmarksContextKey)) || [];
     }
 
     removeAllItems()
     {
         this.bookmarkedDirectories = [];
-        this.saveWorkspace();
+        this.saveBookmarks();
     }
 
-    saveWorkspace()
+    saveBookmarks()
     {
         this.workspaceRoot
             ? this.extensionContext.workspaceState.update(
-                "savedWorkspaceItems",
+                this.storedBookmarksContextKey,
                 this.bookmarkedDirectories
             )
             : this.extensionContext.globalState.update(
-                "savedWorkspaceItems",
+                this.storedBookmarksContextKey,
                 this.bookmarkedDirectories
             );
     }

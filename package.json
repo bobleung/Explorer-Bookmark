@@ -91,16 +91,16 @@
       "view/item/context": [
         {
           "command": "explorer-bookmark.removeItem",
-          "when": "view == explorer-bookmark && viewItem == directlySavedItem"
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory"
         },
         {
           "command": "explorer-bookmark.removeItem",
-          "when": "view == explorer-bookmark && viewItem == directlySavedItem",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "inline"
         },
         {
           "command": "explorer-bookmark.cantRemoveItemMsg",
-          "when": "view == explorer-bookmark && viewItem != directlySavedItem"
+          "when": "view == explorer-bookmark && viewItem != directlyBookmarkedDirectory"
         }
       ]
     },
