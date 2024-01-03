@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { DirectoryProviderCommands } from "../commands/CrudCommands";
 
 export class FileSystemObject extends vscode.TreeItem
 {
@@ -18,7 +19,7 @@ export class FileSystemObject extends vscode.TreeItem
       collapsibleState === vscode.TreeItemCollapsibleState.None
         ? {
           arguments: [this],
-          command: DirectoryProviderActions.OpenItem,
+          command: DirectoryProviderCommands.OpenItem,
           title: this.label,
         }
         : undefined;

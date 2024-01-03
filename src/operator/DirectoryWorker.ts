@@ -35,7 +35,7 @@ export class DirectoryWorker
         }
     }
 
-    async selectItem(uri: vscode.Uri | undefined)
+    public async selectItem(uri: vscode.Uri | undefined)
     {
         if (uri)
         {
@@ -44,7 +44,7 @@ export class DirectoryWorker
         this.saveBookmarks();
     }
 
-    async removeItem(uri: vscode.Uri | undefined)
+    public async removeItem(uri: vscode.Uri | undefined)
     {
         if (uri)
         {
@@ -57,6 +57,12 @@ export class DirectoryWorker
                 this.bookmarkedDirectories.splice(index, 1);
             }
         }
+        this.saveBookmarks();
+    }
+
+    public removeAllItems()
+    {
+        this.bookmarkedDirectories = [];
         this.saveBookmarks();
     }
 
@@ -115,13 +121,7 @@ export class DirectoryWorker
                 : this.extensionContext.globalState.get(this.storedBookmarksContextKey)) || [];
     }
 
-    removeAllItems()
-    {
-        this.bookmarkedDirectories = [];
-        this.saveBookmarks();
-    }
-
-    saveBookmarks()
+    private saveBookmarks()
     {
         this.workspaceRoot
             ? this.extensionContext.workspaceState.update(

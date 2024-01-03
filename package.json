@@ -25,10 +25,6 @@
     "finder",
     "drawer"
   ],
-  "activationEvents": [
-    "onView:explorer-bookmark",
-    "onCommand:explorer-bookmark.selectItem"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsWelcome": [
@@ -47,59 +43,59 @@
     },
     "commands": [
       {
-        "command": "explorer-bookmark.refreshEntry",
+        "command": "directoryprovider/refreshentry",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "explorer-bookmark.selectItem",
+        "command": "directoryprovider/selectitem",
         "title": "Add to Explorer Bookmark"
       },
       {
-        "command": "explorer-bookmark.removeItem",
+        "command": "directoryprovider/removeitem",
         "title": "Remove from Explorer Bookmark",
         "icon": "$(close)"
       },
       {
-        "command": "explorer-bookmark.removeAllItems",
+        "command": "directoryprovider/removeallitems",
         "title": "Remove All Items",
         "icon": "$(trash)"
       },
       {
-        "command": "explorer-bookmark.cantRemoveItemMsg",
+        "command": "directoryprovider/cantremoveitem",
         "title": "Remove from Explorer Bookmark"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "explorer-bookmark.refreshEntry",
+          "command": "directoryprovider/refreshentry",
           "when": "view == explorer-bookmark",
           "group": "navigation"
         },
         {
-          "command": "explorer-bookmark.removeAllItems",
+          "command": "directoryprovider/removeallitems",
           "when": "view == explorer-bookmark",
           "group": "navigation"
         }
       ],
       "explorer/context": [
         {
-          "command": "explorer-bookmark.selectItem"
+          "command": "directoryprovider/selectitem"
         }
       ],
       "view/item/context": [
         {
-          "command": "explorer-bookmark.removeItem",
+          "command": "directoryprovider/removeitem",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory"
         },
         {
-          "command": "explorer-bookmark.removeItem",
+          "command": "directoryprovider/removeitem",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "inline"
         },
         {
-          "command": "explorer-bookmark.cantRemoveItemMsg",
+          "command": "directoryprovider/cantremoveitem",
           "when": "view == explorer-bookmark && viewItem != directlyBookmarkedDirectory"
         }
       ]

@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { DirectoryProvider } from "./provider/DirectoryProvider";
 import { DirectoryWorker } from "./operator/DirectoryWorker";
+import { DirectoryProviderCommands } from "./commands/CrudCommands";
+import { vsCodeCommands } from "./commands/CrudCommands";
 
 export function activate(context: vscode.ExtensionContext)
 {
@@ -20,32 +22,32 @@ export function activate(context: vscode.ExtensionContext)
   context.subscriptions.push(
     ...[
       vscode.commands.registerCommand(
-        DirectoryProviderActions.RefreshEntry,
+        DirectoryProviderCommands.RefreshEntry,
         () => directoryProvider.refresh()
       ),
       vscode.commands.registerCommand(
-        DirectoryProviderActions.OpenItem,
+        DirectoryProviderCommands.OpenItem,
         (file) =>
         {
           vscode.commands.executeCommand(
-            "vscode.open",
+            vsCodeCommands.Open,
             vscode.Uri.parse(file.resourceUri.path)
           );
         }
       ),
       vscode.commands.registerCommand(
-        DirectoryProviderActions.SelectItem,
+        DirectoryProviderCommands.SelectItem,
         (args) => directoryProvider.selectItem(vscode.Uri.parse(args.path))
       ),
       vscode.commands.registerCommand(
-        DirectoryProviderActions.RemoveItem,
+        DirectoryProviderCommands.RemoveItem,
         (args) =>
         {
           directoryProvider.removeItem(args.resourceUri);
         }
       ),
       vscode.commands.registerCommand(
-        DirectoryProviderActions.CantRemoveItem,
+        DirectoryProviderCommands.CantRemoveItem,
         () =>
         {
           vscode.window.showInformationMessage(
@@ -54,7 +56,7 @@ export function activate(context: vscode.ExtensionContext)
         }
       ),
       vscode.commands.registerCommand(
-        DirectoryProviderActions.RemoveAllItems,
+        DirectoryProviderCommands.RemoveAllItems,
         () => directoryProvider.removeAllItems()
       ),
     ]
