@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
-import { ExplorerBookmark } from "./provider/ExplorerBookmark";
+import { DirectoryProvider } from "./provider/DirectoryProvider";
 
-export function activate(context: vscode.ExtensionContext) {
-  const explorerBookmark = new ExplorerBookmark(
+export function activate(context: vscode.ExtensionContext)
+{
+  const explorerBookmark = new DirectoryProvider(
     context,
     vscode.workspace.workspaceFolders
   );
@@ -14,7 +15,8 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.commands.registerCommand("explorer-bookmark.refreshEntry", () =>
         explorerBookmark.refresh()
       ),
-      vscode.commands.registerCommand("explorer-bookmark.openFile", (file) => {
+      vscode.commands.registerCommand("explorer-bookmark.openFile", (file) =>
+      {
         vscode.commands.executeCommand(
           "vscode.open",
           vscode.Uri.parse(file.resourceUri.path)
@@ -25,13 +27,15 @@ export function activate(context: vscode.ExtensionContext) {
       ),
       vscode.commands.registerCommand(
         "explorer-bookmark.removeItem",
-        (args) => {
+        (args) =>
+        {
           explorerBookmark.removeItem(args.resourceUri);
         }
       ),
       vscode.commands.registerCommand(
         "explorer-bookmark.cantRemoveItemMsg",
-        () => {
+        () =>
+        {
           vscode.window.showInformationMessage(
             "You can only remove items that were directly added to the view"
           );
@@ -44,4 +48,4 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() {}
+export function deactivate() { }

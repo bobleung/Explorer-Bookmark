@@ -1,17 +1,18 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { FileSystemObject } from "./FileSystemObject";
+import { FileSystemObject } from "../types/FileSystemObject";
+import { TypedDirectory } from "../types/TypedDirectory";
+import { buildTypedDirectory } from "../types/TypedDirectory";
 
-export class ExplorerBookmark
+export class DirectoryProvider
   implements vscode.TreeDataProvider<FileSystemObject>
 {
-  private selectedFSObjects: vscode.Uri[] = [];
-
+  private bookmarkedDirectories: TypedDirectory[] = [];
   private saveWorkspaceSetting: boolean | undefined = false;
-
   private _onDidChangeTreeData: vscode.EventEmitter<
     FileSystemObject | undefined | null | void
   > = new vscode.EventEmitter<FileSystemObject | undefined | null | void>();
+
   readonly onDidChangeTreeData: vscode.Event<
     FileSystemObject | undefined | null | void
   > = this._onDidChangeTreeData.event;
@@ -19,53 +20,67 @@ export class ExplorerBookmark
   constructor(
     private extensionContext: vscode.ExtensionContext,
     private workspaceRoot: readonly vscode.WorkspaceFolder[] | undefined
-  ) {
-    this.getSettings();
-    if (this.saveWorkspaceSetting && this.selectedFSObjects.length > 0) {
+  )
+  {
+    this.hydrateState();
+    if (this.saveWorkspaceSetting && this.bookmarkedDirectories.length > 0)
+    {
       this.refresh();
     }
   }
 
   getTreeItem(
     element: FileSystemObject
-  ): vscode.TreeItem | Thenable<vscode.TreeItem> {
+  ): vscode.TreeItem | Thenable<vscode.TreeItem>
+  {
     return element;
   }
 
-  async getChildren(element?: FileSystemObject): Promise<FileSystemObject[]> {
-    if (element) {
+  async getChildren(element?: FileSystemObject): Promise<FileSystemObject[]>
+  {
+    if (element)
+    {
       return this.directorySearch(element.resourceUri);
-    } else {
-      return this.selectedFSObjects.length > 0
-        ? this.createEntries(this.selectedFSObjects)
+    } else
+    {
+      return this.bookmarkedDirectories.length > 0
+        ? this.createEntries(this.bookmarkedDirectories)
         : Promise.resolve([]);
     }
   }
 
-  async selectItem(uri: vscode.Uri | undefined) {
-    if (uri) {
-      this.selectedFSObjects.push(uri);
+  async selectItem(uri: vscode.Uri | undefined)
+  {
+    if (uri)
+    {
+      this.bookmarkedDirectories.push(await buildTypedDirectory(uri));
     }
     this.refresh();
     this.saveWorkspace();
   }
 
-  async removeItem(uri: vscode.Uri | undefined) {
-    if (uri) {
-      const index = this.selectedFSObjects.indexOf(uri);
-      if (index > -1) {
-        this.selectedFSObjects.splice(index, 1);
+  async removeItem(uri: vscode.Uri | undefined)
+  {
+    if (uri)
+    {
+      const typedDirectory = await buildTypedDirectory(uri)
+      const index = this.bookmarkedDirectories.indexOf(typedDirectory);
+      if (index > -1)
+      {
+        this.bookmarkedDirectories.splice(index, 1);
       }
     }
     this.refresh();
     this.saveWorkspace();
   }
 
-  private async directorySearch(uri: vscode.Uri) {
+  private async directorySearch(uri: vscode.Uri)
+  {
     const folders = await vscode.workspace.fs.readDirectory(uri);
     return folders
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map((item) => {
+      .map((item) =>
+      {
         const [name, type] = item;
         const isDirectory =
           type === vscode.FileType.Directory
@@ -80,11 +95,14 @@ export class ExplorerBookmark
       });
   }
 
-  private async createEntries(selectedFSObjects: vscode.Uri[]) {
+  private async createEntries(selectedFSObjects: TypedDirectory[])
+  {
     let folderSystem: FileSystemObject[] = [];
 
-    for (const fsItem of selectedFSObjects) {
-      let type = (await vscode.workspace.fs.stat(fsItem)).type;
+    for (const fsItem of selectedFSObjects)
+    {
+      const { path: filePath, type: type } = fsItem;
+      const file = vscode.Uri.file(filePath);
 
       folderSystem.push(
         new FileSystemObject(
@@ -92,7 +110,7 @@ export class ExplorerBookmark
           type === vscode.FileType.File
             ? vscode.TreeItemCollapsibleState.None
             : vscode.TreeItemCollapsibleState.Collapsed,
-          fsItem
+          file
         ).setContextValue("directlySavedItem")
       );
     }
@@ -100,35 +118,39 @@ export class ExplorerBookmark
     return folderSystem;
   }
 
-  private getSettings() {
+  private hydrateState(): void
+  {
     this.saveWorkspaceSetting = vscode.workspace
       .getConfiguration("explorer-bookmark")
       .get("saveWorkspace");
-    this.selectedFSObjects =
+    this.bookmarkedDirectories =
       (this.workspaceRoot
         ? this.extensionContext.workspaceState.get("savedWorkspaceItems")
         : this.extensionContext.globalState.get("savedWorkspaceItems")) || [];
   }
 
-  removeAllItems() {
-    this.selectedFSObjects = [];
+  removeAllItems()
+  {
+    this.bookmarkedDirectories = [];
     this.refresh();
     this.saveWorkspace();
   }
 
-  refresh(): void {
+  refresh(): void
+  {
     this._onDidChangeTreeData.fire();
   }
 
-  saveWorkspace() {
+  saveWorkspace()
+  {
     this.workspaceRoot
       ? this.extensionContext.workspaceState.update(
-          "savedWorkspaceItems",
-          this.selectedFSObjects
-        )
+        "savedWorkspaceItems",
+        this.bookmarkedDirectories
+      )
       : this.extensionContext.globalState.update(
-          "savedWorkspaceItems",
-          this.selectedFSObjects
-        );
+        "savedWorkspaceItems",
+        this.bookmarkedDirectories
+      );
   }
 }
