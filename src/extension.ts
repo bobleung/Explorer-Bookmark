@@ -1,19 +1,24 @@
 import * as vscode from "vscode";
 import { DirectoryProvider } from "./provider/DirectoryProvider";
+import { DirectoryWorker } from "./operator/DirectoryWorker";
 
 export function activate(context: vscode.ExtensionContext)
 {
-  const explorerBookmark = new DirectoryProvider(
+  const directoryOperator = new DirectoryWorker(
     context,
     vscode.workspace.workspaceFolders
   );
 
-  vscode.window.registerTreeDataProvider("explorer-bookmark", explorerBookmark);
+  const directoryProvider = new DirectoryProvider(
+    directoryOperator
+  );
+
+  vscode.window.registerTreeDataProvider("explorer-bookmark", directoryProvider);
 
   context.subscriptions.push(
     ...[
       vscode.commands.registerCommand("explorer-bookmark.refreshEntry", () =>
-        explorerBookmark.refresh()
+        directoryProvider.refresh()
       ),
       vscode.commands.registerCommand("explorer-bookmark.openFile", (file) =>
       {
@@ -23,13 +28,13 @@ export function activate(context: vscode.ExtensionContext)
         );
       }),
       vscode.commands.registerCommand("explorer-bookmark.selectItem", (args) =>
-        explorerBookmark.selectItem(vscode.Uri.parse(args.path))
+        directoryProvider.selectItem(vscode.Uri.parse(args.path))
       ),
       vscode.commands.registerCommand(
         "explorer-bookmark.removeItem",
         (args) =>
         {
-          explorerBookmark.removeItem(args.resourceUri);
+          directoryProvider.removeItem(args.resourceUri);
         }
       ),
       vscode.commands.registerCommand(
@@ -42,7 +47,7 @@ export function activate(context: vscode.ExtensionContext)
         }
       ),
       vscode.commands.registerCommand("explorer-bookmark.removeAllItems", () =>
-        explorerBookmark.removeAllItems()
+        directoryProvider.removeAllItems()
       ),
     ]
   );
