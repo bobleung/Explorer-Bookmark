@@ -8,7 +8,7 @@
   "displayName": "Explorer Bookmark",
   "description": "Quickly access important folders and files",
   "icon": "docs/icon.png",
-  "version": "0.0.5",
+  "version": "1.0.1",
   "engines": {
     "vscode": "^1.55.0"
   },
@@ -24,6 +24,9 @@
     "manager",
     "finder",
     "drawer"
+  ],
+  "activationEvents": [
+    "onCommand:explorer-bookmark.selectItem"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -123,7 +126,7 @@
     "@types/glob": "^7.2.0",
     "@types/mocha": "^8.2.3",
     "@types/node": "^12.20.55",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.55.0",
     "@typescript-eslint/eslint-plugin": "^4.33.0",
     "@typescript-eslint/parser": "^4.33.0",
     "eslint": "^7.32.0",
