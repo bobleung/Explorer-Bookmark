@@ -15,6 +15,7 @@ export enum DirectoryProviderCommands
     RemoveSection = 'directoryprovider/removesection',
     SelectItemToSection = 'directoryprovider/selectitemtosection',
     ViewAISummary = 'directoryprovider/viewaisummary',
+    ShowGitDiff = 'directoryprovider/showgitdiff',
     ExportTeamBookmarks = 'directoryprovider/exportteambookmarks',
     ImportTeamBookmarks = 'directoryprovider/importteambookmarks',
     SyncTeamBookmarks = 'directoryprovider/syncteambookmarks',

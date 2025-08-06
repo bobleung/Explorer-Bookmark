@@ -98,6 +98,11 @@
         "icon": "$(tag)"
       },
       {
+        "command": "directoryprovider/showgitdiff",
+        "title": "Git Diff vs Remote",
+        "icon": "$(git-compare)"
+      },
+      {
         "command": "directoryprovider/exportteambookmarks",
         "title": "Export Team Bookmarks",
         "icon": "$(export)"
@@ -188,6 +193,11 @@
           "command": "directoryprovider/addbookmarktags",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "annotations"
+        },
+        {
+          "command": "directoryprovider/showgitdiff",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "git"
         },
         {
           "command": "directoryprovider/removesection",

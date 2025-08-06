@@ -42,6 +42,19 @@ export class AIService
         }
     }
 
+    public static async generateCustomSummary(prompt: string): Promise<string>
+    {
+        try
+        {
+            // Try multiple Copilot API access methods for custom prompts
+            return await this.generateCopilotCustomSummary(prompt);
+        } catch (error)
+        {
+            console.error('Error generating custom AI summary:', error);
+            return "Error generating custom summary. GitHub Copilot may be unavailable.";
+        }
+    }
+
     private static async generateCopilotSummary(content: string, filename: string, extension: string): Promise<string>
     {
         try
@@ -77,6 +90,111 @@ export class AIService
             console.error('Error invoking GitHub Copilot:', error);
             return this.generateFallbackSummary(content, filename, extension);
         }
+    }
+
+    private static async generateCopilotCustomSummary(prompt: string): Promise<string>
+    {
+        try
+        {
+            // Use VS Code's GitHub Copilot API to get the summary
+            const copilotResponse = await this.invokeCopilotAPI(prompt);
+
+            if (copilotResponse)
+            {
+                return this.formatCopilotResponse(copilotResponse, 'Git Diff Analysis');
+            } else
+            {
+                // Alternative: Open interactive Copilot session for custom prompt
+                const useInteractive = await vscode.window.showInformationMessage(
+                    'GitHub Copilot API not directly accessible. Would you like to analyze this diff interactively?',
+                    'Yes, Open Copilot Chat', 'Use Basic Analysis'
+                );
+
+                if (useInteractive === 'Yes, Open Copilot Chat')
+                {
+                    return await this.generateInteractiveCustomSummary(prompt);
+                } else
+                {
+                    // Return the prompt for manual analysis
+                    return this.generateBasicDiffAnalysis(prompt);
+                }
+            }
+        } catch (error)
+        {
+            console.error('Error invoking GitHub Copilot for custom prompt:', error);
+            return this.generateBasicDiffAnalysis(prompt);
+        }
+    }
+
+    private static async generateInteractiveCustomSummary(prompt: string): Promise<string>
+    {
+        try
+        {
+            // Create a temporary document with the custom prompt
+            const promptDoc = await vscode.workspace.openTextDocument({
+                content: prompt,
+                language: 'markdown'
+            });
+
+            // Show the document
+            await vscode.window.showTextDocument(promptDoc);
+
+            // Try to open Copilot Chat
+            try
+            {
+                await vscode.commands.executeCommand('github.copilot.interactiveEditor.explain');
+            } catch
+            {
+                try
+                {
+                    await vscode.commands.executeCommand('workbench.panel.chat.view.copilot.focus');
+                } catch
+                {
+                    vscode.window.showInformationMessage(
+                        'Please use the Copilot Chat panel to analyze the diff. The prompt has been opened in a new document.'
+                    );
+                }
+            }
+
+            return `# 🤖 Git Diff Analysis
+
+*To generate a comprehensive AI analysis:*
+
+1. **Copy the analysis prompt** from the document that was just opened
+2. **Open GitHub Copilot Chat** (Ctrl+Shift+P → "GitHub Copilot: Focus on Copilot Chat")
+3. **Paste and send** the prompt to get an intelligent analysis
+
+---
+
+*The prompt has been prepared for you. Please follow the steps above to use GitHub Copilot Chat for detailed diff analysis.*`;
+
+        } catch (error)
+        {
+            console.error('Error creating interactive custom session:', error);
+            return this.generateBasicDiffAnalysis(prompt);
+        }
+    }
+
+    private static generateBasicDiffAnalysis(prompt: string): string
+    {
+        // Extract key information from the prompt
+        const lines = prompt.split('\n');
+        const diffLines = lines.filter(line => line.startsWith('+') || line.startsWith('-'));
+        const additions = diffLines.filter(line => line.startsWith('+')).length;
+        const deletions = diffLines.filter(line => line.startsWith('-')).length;
+
+        return `# Git Diff Analysis
+
+## Summary
+- **Additions**: ${additions} lines
+- **Deletions**: ${deletions} lines
+- **Net Change**: ${additions - deletions} lines
+
+## Change Overview
+This diff contains modifications to the file. For detailed AI analysis, please use GitHub Copilot Chat with the provided prompt.
+
+## Manual Review Recommended
+For complex changes, manual review and GitHub Copilot Chat analysis are recommended to understand the full impact of these modifications.`;
     }
 
     private static async generateInteractiveSummary(content: string, filename: string, extension: string, prompt: string): Promise<string>

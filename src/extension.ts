@@ -105,6 +105,10 @@ export function activate(context: vscode.ExtensionContext)
         (args) => directoryProvider.addTags(args.resourceUri)
       ),
       vscode.commands.registerCommand(
+        DirectoryProviderCommands.ShowGitDiff,
+        (args) => directoryProvider.showGitDiff(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
         DirectoryProviderCommands.ExportTeamBookmarks,
         () => directoryProvider.exportTeamBookmarks()
       ),

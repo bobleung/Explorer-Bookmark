@@ -115,24 +115,6 @@ export class DirectoryWorker
             if (section)
             {
                 section.addDirectory(typedDirectory);
-
-                // Commit the added file/folder to git (use original absolute path)
-                if (workspaceRoot)
-                {
-                    const git = simpleGit(workspaceRoot);
-                    const filePath = uri.fsPath;
-                    try
-                    {
-                        await git.add(filePath);
-                        await git.commit(`Bookmarked: ${filePath} in section ${section.name}`);
-                    } catch (error)
-                    {
-                        console.error('Git commit failed:', error);
-                    }
-                } else
-                {
-                    console.warn('No workspace folder found for git operations.');
-                }
             }
         }
         this.saveSections();
@@ -376,6 +358,208 @@ export class DirectoryWorker
                 vscode.window.showInformationMessage(`Added ${tags.length} tags to bookmark`);
                 return;
             }
+        }
+    }
+
+    public async showGitDiff(uri: vscode.Uri): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git diff requires a workspace.');
+            return;
+        }
+
+        try
+        {
+            const git = simpleGit(workspaceRoot);
+
+            // Get the current branch
+            const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
+
+            // Get remote branches
+            const remotes = await git.getRemotes(true);
+            if (remotes.length === 0)
+            {
+                vscode.window.showErrorMessage('No remote repositories found.');
+                return;
+            }
+
+            // Assume origin as default remote, or use the first available
+            const remoteName = remotes.find((r: any) => r.name === 'origin')?.name || remotes[0].name;
+            const remoteBranch = `${remoteName}/${currentBranch}`;
+
+            // Get relative path for the file
+            const relativePath = path.relative(workspaceRoot, uri.fsPath);
+
+            // Check if the file exists in both local and remote
+            const diffResult = await git.diff([remoteBranch, '--', relativePath]);
+
+            if (!diffResult || diffResult.trim() === '')
+            {
+                vscode.window.showInformationMessage('No differences found between local and remote for this file.');
+                return;
+            }
+
+            // Ask user what they want to do with the diff
+            const action = await vscode.window.showInformationMessage(
+                'Git diff found between local and remote versions.',
+                'View Diff', 'AI Summarize Diff', 'Cancel'
+            );
+
+            switch (action)
+            {
+                case 'View Diff':
+                    await this.showDiffInEditor(diffResult, relativePath, remoteBranch);
+                    break;
+                case 'AI Summarize Diff':
+                    await this.generateAIDiffSummary(diffResult, relativePath, remoteBranch);
+                    break;
+                default:
+                    return;
+            }
+
+        } catch (error)
+        {
+            console.error('Git diff failed:', error);
+            vscode.window.showErrorMessage(`Failed to get git diff: ${error}`);
+        }
+    }
+
+    private async showDiffInEditor(diffContent: string, filePath: string, remoteBranch: string): Promise<void>
+    {
+        const doc = await vscode.workspace.openTextDocument({
+            content: diffContent,
+            language: 'diff'
+        });
+
+        await vscode.window.showTextDocument(doc, {
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: false
+        });
+    }
+
+    private async generateAIDiffSummary(diffContent: string, filePath: string, remoteBranch: string): Promise<void>
+    {
+        try
+        {
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Generating AI diff summary...",
+                cancellable: false
+            }, async () =>
+            {
+                const prompt = `Analyze this git diff and provide a clear, concise summary of the changes:
+
+File: ${filePath}
+Comparing: local vs ${remoteBranch}
+
+Diff:
+${diffContent}
+
+Please provide:
+1. A brief summary of what changed
+2. Key modifications, additions, or deletions
+3. Potential impact or significance of these changes
+4. Any notable patterns or concerns
+
+Keep the summary focused and easy to understand.`;
+
+                const summary = await AIService.generateCustomSummary(prompt);
+
+                // Create and show a webview panel with the diff summary
+                const panel = vscode.window.createWebviewPanel(
+                    'gitDiffSummary',
+                    `Git Diff Summary - ${path.basename(filePath)}`,
+                    vscode.ViewColumn.Beside,
+                    {
+                        enableScripts: false,
+                        retainContextWhenHidden: true
+                    }
+                );
+
+                // Simple HTML rendering of the summary
+                const htmlContent = summary
+                    .replace(/\n/g, '<br>')
+                    .replace(/### (.*?)(<br>|$)/g, '<h3>$1</h3>')
+                    .replace(/## (.*?)(<br>|$)/g, '<h2>$1</h2>')
+                    .replace(/# (.*?)(<br>|$)/g, '<h1>$1</h1>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/`(.*?)`/g, '<code>$1</code>')
+                    .replace(/^- (.*)(<br>|$)/gm, '<li>$1</li>')
+                    .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+
+                panel.webview.html = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body { 
+                                font-family: var(--vscode-font-family); 
+                                color: var(--vscode-foreground);
+                                background-color: var(--vscode-editor-background);
+                                padding: 20px;
+                                line-height: 1.6;
+                                max-width: 800px;
+                            }
+                            .header {
+                                border-bottom: 2px solid var(--vscode-foreground);
+                                padding-bottom: 10px;
+                                margin-bottom: 20px;
+                            }
+                            .file-info {
+                                background-color: var(--vscode-textCodeBlock-background);
+                                padding: 10px;
+                                border-radius: 5px;
+                                margin-bottom: 20px;
+                                font-family: var(--vscode-editor-font-family);
+                            }
+                            h1, h2, h3, h4, h5, h6 { 
+                                color: var(--vscode-foreground);
+                                margin-top: 1.5em;
+                                margin-bottom: 0.5em;
+                            }
+                            h1 { font-size: 1.8em; }
+                            h2 { font-size: 1.5em; }
+                            h3 { font-size: 1.3em; }
+                            code { 
+                                background-color: var(--vscode-textCodeBlock-background);
+                                color: var(--vscode-textPreformat-foreground);
+                                padding: 2px 4px;
+                                border-radius: 3px;
+                                font-family: var(--vscode-editor-font-family);
+                            }
+                            ul { margin: 1em 0; padding-left: 2em; }
+                            li { margin: 0.5em 0; }
+                            strong { font-weight: bold; }
+                            em { font-style: italic; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>Git Diff Summary</h1>
+                        </div>
+                        <div class="file-info">
+                            <strong>File:</strong> ${filePath}<br>
+                            <strong>Comparison:</strong> local vs ${remoteBranch}
+                        </div>
+                        <div class="content">
+                            ${htmlContent}
+                        </div>
+                    </body>
+                    </html>
+                `;
+            });
+        } catch (error)
+        {
+            console.error('Error generating AI diff summary:', error);
+            vscode.window.showErrorMessage('Failed to generate AI diff summary');
         }
     }
 

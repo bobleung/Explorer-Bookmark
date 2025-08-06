@@ -71,6 +71,11 @@ export class DirectoryProvider
     this.refresh();
   }
 
+  async showGitDiff(uri: vscode.Uri)
+  {
+    await this.directoryOperator.showGitDiff(uri);
+  }
+
   async exportTeamBookmarks()
   {
     await this.directoryOperator.exportTeamBookmarks();
@@ -92,6 +97,11 @@ export class DirectoryProvider
   {
     await this.directoryOperator.injectTeamBookmarks();
     this.refresh();
+  }
+
+  async generateShareableConfig()
+  {
+    await this.directoryOperator.generateShareableConfig();
   }
 
   removeAllItems()
