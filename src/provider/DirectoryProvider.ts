@@ -30,15 +30,67 @@ export class DirectoryProvider
     return await this.directoryOperator.getChildren(element);
   }
 
-  async selectItem(uri: vscode.Uri | undefined)
+  async selectItem(uri: vscode.Uri | undefined, sectionId?: string)
   {
-    await this.directoryOperator.selectItem(uri);
+    await this.directoryOperator.selectItem(uri, sectionId);
     this.refresh();
   }
 
-  async removeItem(uri: vscode.Uri | undefined)
+  async removeItem(uri: vscode.Uri | undefined, sectionId?: string)
   {
-    await this.directoryOperator.removeItem(uri);
+    await this.directoryOperator.removeItem(uri, sectionId);
+    this.refresh();
+  }
+
+  async addSection(name: string)
+  {
+    await this.directoryOperator.addSection(name);
+    this.refresh();
+  }
+
+  async removeSection(sectionId: string)
+  {
+    await this.directoryOperator.removeSection(sectionId);
+    this.refresh();
+  }
+
+  async viewAISummary(uri: vscode.Uri)
+  {
+    await this.directoryOperator.viewAISummary(uri);
+  }
+
+  async addComment(uri: vscode.Uri)
+  {
+    await this.directoryOperator.addComment(uri);
+    this.refresh();
+  }
+
+  async addTags(uri: vscode.Uri)
+  {
+    await this.directoryOperator.addTags(uri);
+    this.refresh();
+  }
+
+  async exportTeamBookmarks()
+  {
+    await this.directoryOperator.exportTeamBookmarks();
+  }
+
+  async importTeamBookmarks()
+  {
+    await this.directoryOperator.importTeamBookmarks();
+    this.refresh();
+  }
+
+  async syncTeamBookmarks()
+  {
+    await this.directoryOperator.syncTeamBookmarks();
+    this.refresh();
+  }
+
+  async injectTeamBookmarks()
+  {
+    await this.directoryOperator.injectTeamBookmarks();
     this.refresh();
   }
 

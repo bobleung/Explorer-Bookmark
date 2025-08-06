@@ -33,7 +33,7 @@
     "viewsWelcome": [
       {
         "view": "explorer-bookmark",
-        "contents": "Right click and add a file or folder"
+        "contents": "Right click and add a file or folder.\n\nClick the + icon above to add a new section to organize your bookmarks.\n\n✨ New Features:\n• AI-powered file summaries\n• Team bookmark sharing\n• Comments and tags for bookmarks\n• Export/import bookmarks for collaboration"
       }
     ],
     "views": {
@@ -55,6 +55,10 @@
         "title": "Add to Explorer Bookmark"
       },
       {
+        "command": "directoryprovider/selectitemtosection",
+        "title": "Add to Explorer Bookmark Section..."
+      },
+      {
         "command": "directoryprovider/removeitem",
         "title": "Remove from Explorer Bookmark",
         "icon": "$(close)"
@@ -67,6 +71,51 @@
       {
         "command": "directoryprovider/cantremoveitem",
         "title": "Remove from Explorer Bookmark"
+      },
+      {
+        "command": "directoryprovider/addsection",
+        "title": "Add Section",
+        "icon": "$(add)"
+      },
+      {
+        "command": "directoryprovider/removesection",
+        "title": "Remove Section",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "directoryprovider/viewaisummary",
+        "title": "AI Summary",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "directoryprovider/addbookmarkcomment",
+        "title": "Add Comment",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "directoryprovider/addbookmarktags",
+        "title": "Add Tags",
+        "icon": "$(tag)"
+      },
+      {
+        "command": "directoryprovider/exportteambookmarks",
+        "title": "Export Team Bookmarks",
+        "icon": "$(export)"
+      },
+      {
+        "command": "directoryprovider/importteambookmarks",
+        "title": "Import Team Bookmarks",
+        "icon": "$(import)"
+      },
+      {
+        "command": "directoryprovider/syncteambookmarks",
+        "title": "Sync Team Bookmarks",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "directoryprovider/injectteambookmarks",
+        "title": "Inject Team Bookmarks",
+        "icon": "$(file-code)"
       }
     ],
     "menus": {
@@ -77,7 +126,32 @@
           "group": "navigation"
         },
         {
+          "command": "directoryprovider/addsection",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
+        },
+        {
           "command": "directoryprovider/removeallitems",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
+        },
+        {
+          "command": "directoryprovider/exportteambookmarks",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
+        },
+        {
+          "command": "directoryprovider/importteambookmarks",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
+        },
+        {
+          "command": "directoryprovider/syncteambookmarks",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
+        },
+        {
+          "command": "directoryprovider/injectteambookmarks",
           "when": "view == explorer-bookmark",
           "group": "navigation"
         }
@@ -85,6 +159,9 @@
       "explorer/context": [
         {
           "command": "directoryprovider/selectitem"
+        },
+        {
+          "command": "directoryprovider/selectitemtosection"
         }
       ],
       "view/item/context": [
@@ -98,8 +175,27 @@
           "group": "inline"
         },
         {
+          "command": "directoryprovider/viewaisummary",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "ai"
+        },
+        {
+          "command": "directoryprovider/addbookmarkcomment",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "annotations"
+        },
+        {
+          "command": "directoryprovider/addbookmarktags",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "annotations"
+        },
+        {
+          "command": "directoryprovider/removesection",
+          "when": "view == explorer-bookmark && viewItem == bookmarkSection"
+        },
+        {
           "command": "directoryprovider/cantremoveitem",
-          "when": "view == explorer-bookmark && viewItem != directlyBookmarkedDirectory"
+          "when": "view == explorer-bookmark && viewItem != directlyBookmarkedDirectory && viewItem != bookmarkSection"
         }
       ]
     },
@@ -134,5 +230,8 @@
     "mocha": "^10.2.0",
     "typescript": "^4.9.5",
     "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "simple-git": "^3.28.0"
   }
 }

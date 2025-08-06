@@ -5,16 +5,19 @@ export class FileSystemObject extends vscode.TreeItem
 {
   resourceUri: vscode.Uri;
   command?: vscode.Command;
+  sectionId?: string;
 
   constructor(
     public readonly label: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-    uri: vscode.Uri
+    uri: vscode.Uri,
+    sectionId?: string
   )
   {
     super(label, collapsibleState);
     this.tooltip = uri.fsPath;
     this.resourceUri = uri;
+    this.sectionId = sectionId;
     this.command =
       collapsibleState === vscode.TreeItemCollapsibleState.None
         ? {
