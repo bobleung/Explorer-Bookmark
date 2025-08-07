@@ -75,7 +75,8 @@ export class DirectoryWorker
     {
         if (uri)
         {
-            const typedDirectory = await buildTypedDirectory(uri);
+            const currentUser = await this.getCurrentUser();
+            const typedDirectory = await buildTypedDirectory(uri, undefined, undefined, currentUser);
 
             // Convert to relative path for storage if we have a workspace root
             const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
@@ -741,10 +742,11 @@ Keep the summary focused and easy to understand.`;
             }
 
             // Since we now store relative paths internally, we can use them directly
+            const currentUser = await this.getCurrentUser();
             const config = {
                 version: '1.0.0',
                 lastUpdated: new Date().toISOString(),
-                updatedBy: vscode.env.machineId,
+                updatedBy: currentUser,
                 sections: this.bookmarkSections
             };
 
@@ -1117,6 +1119,25 @@ Keep the summary focused and easy to understand.`;
         return this.findParentBookmarkByUri(uri);
     }
 
+    // Get current user identifier (git username or fallback)
+    private async getCurrentUser(): Promise<string>
+    {
+        try
+        {
+            if (this.workspaceRoot && this.workspaceRoot.length > 0)
+            {
+                const gitService = new GitService(this.workspaceRoot[0].uri.fsPath);
+                return await gitService.getCurrentGitUser();
+            }
+        } catch (error)
+        {
+            console.error('Error getting git user:', error);
+        }
+
+        // Fallback to shortened machine ID if git not available
+        return vscode.env.machineId.substring(0, 8);
+    }
+
     // New Collaborative Methods
     public async getTypedDirectoryForUri(uri: vscode.Uri): Promise<TypedDirectory | null>
     {
@@ -1134,7 +1155,7 @@ Keep the summary focused and easy to understand.`;
         const result = this.findBookmarkOrParentByUri(uri);
         if (result)
         {
-            const currentUser = vscode.env.machineId;
+            const currentUser = await this.getCurrentUser();
             result.bookmark.addComment(currentUser, comment, 'general');
             this.saveSections();
         }

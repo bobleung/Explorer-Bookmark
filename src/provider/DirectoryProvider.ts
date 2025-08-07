@@ -3,6 +3,7 @@ import { FileSystemObject } from "../types/FileSystemObject";
 import { DirectoryWorker } from "../operator/DirectoryWorker";
 import { CollaborativePanel } from "../webview/CollaborativePanel";
 import { GitHubService } from "../services/GitHubService";
+import { GitService } from "../services/GitService";
 
 export class DirectoryProvider
   implements vscode.TreeDataProvider<FileSystemObject>
@@ -19,6 +20,26 @@ export class DirectoryProvider
     private directoryOperator: DirectoryWorker,
   )
   { }
+
+  // Get current user identifier (git username or fallback)
+  private async getCurrentUser(): Promise<string>
+  {
+    try
+    {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders && workspaceFolders.length > 0)
+      {
+        const gitService = new GitService(workspaceFolders[0].uri.fsPath);
+        return await gitService.getCurrentGitUser();
+      }
+    } catch (error)
+    {
+      console.error('Error getting git user:', error);
+    }
+
+    // Fallback to shortened machine ID if git not available
+    return vscode.env.machineId.substring(0, 8);
+  }
 
   getTreeItem(
     element: FileSystemObject
@@ -205,7 +226,7 @@ export class DirectoryProvider
 
     if (status)
     {
-      const currentUser = vscode.env.machineId;
+      const currentUser = await this.getCurrentUser();
       item.updateStatus(status.label as any, currentUser);
       await this.directoryOperator.saveItems();
       this.refresh();
@@ -229,7 +250,7 @@ export class DirectoryProvider
 
     if (priority)
     {
-      const currentUser = vscode.env.machineId;
+      const currentUser = await this.getCurrentUser();
       item.updatePriority(priority.label as any, currentUser);
       await this.directoryOperator.saveItems();
       this.refresh();

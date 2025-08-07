@@ -472,4 +472,37 @@ export class GitService
             return '';
         }
     }
+
+    // Get current git user name
+    async getCurrentGitUser(): Promise<string>
+    {
+        try
+        {
+            const userName = await this.git.getConfig('user.name');
+            const userValue = typeof userName === 'string' ? userName : userName?.value;
+
+            if (userValue && userValue.trim())
+            {
+                return userValue.trim();
+            }
+
+            // Fallback to email if name is not set
+            const userEmail = await this.git.getConfig('user.email');
+            const emailValue = typeof userEmail === 'string' ? userEmail : userEmail?.value;
+
+            if (emailValue && emailValue.trim())
+            {
+                // Extract username from email (part before @)
+                const emailUser = emailValue.trim().split('@')[0];
+                return emailUser;
+            }
+
+            // Final fallback to machine ID
+            return vscode.env.machineId.substring(0, 8);
+        } catch (error)
+        {
+            console.error('Error getting git user:', error);
+            return vscode.env.machineId.substring(0, 8);
+        }
+    }
 }

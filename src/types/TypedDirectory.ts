@@ -337,10 +337,33 @@ export class TypedDirectory
   }
 }
 
-export async function buildTypedDirectory(uri: vscode.Uri, comment?: string, tags?: string[])
+export async function buildTypedDirectory(uri: vscode.Uri, comment?: string, tags?: string[], userName?: string)
 {
   const type = (await vscode.workspace.fs.stat(uri)).type;
-  const username = vscode.env.machineId; // Use machine ID as user identifier
+
+  let username = userName;
+  if (!username)
+  {
+    // Get git username if not provided
+    try
+    {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders && workspaceFolders.length > 0)
+      {
+        const { GitService } = await import('../services/GitService');
+        const gitService = new GitService(workspaceFolders[0].uri.fsPath);
+        username = await gitService.getCurrentGitUser();
+      } else
+      {
+        username = vscode.env.machineId.substring(0, 8);
+      }
+    } catch (error)
+    {
+      console.error('Error getting git user in buildTypedDirectory:', error);
+      username = vscode.env.machineId.substring(0, 8);
+    }
+  }
+
   return new TypedDirectory(uri.fsPath, type, comment, tags, username);
 }
 

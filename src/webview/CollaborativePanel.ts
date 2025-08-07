@@ -70,12 +70,37 @@ export class CollaborativePanel
         );
     }
 
-    private _handleMessage(message: any)
+    // Get current user identifier (git username or fallback)
+    private async getCurrentUser(): Promise<string>
+    {
+        try
+        {
+            if (this._gitService)
+            {
+                return await this._gitService.getCurrentGitUser();
+            }
+
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0)
+            {
+                const gitService = new GitService(workspaceFolders[0].uri.fsPath);
+                return await gitService.getCurrentGitUser();
+            }
+        } catch (error)
+        {
+            console.error('Error getting git user:', error);
+        }
+
+        // Fallback to shortened machine ID if git not available
+        return vscode.env.machineId.substring(0, 8);
+    }
+
+    private async _handleMessage(message: any)
     {
         switch (message.command)
         {
             case 'addComment':
-                this._handleAddComment(message.data);
+                await this._handleAddComment(message.data);
                 break;
             case 'resolveComment':
                 this._handleResolveComment(message.commentId);
@@ -84,10 +109,10 @@ export class CollaborativePanel
                 this._handleAddReaction(message.commentId, message.emoji, message.userId);
                 break;
             case 'updateStatus':
-                this._handleUpdateStatus(message.status);
+                await this._handleUpdateStatus(message.status);
                 break;
             case 'updatePriority':
-                this._handleUpdatePriority(message.priority);
+                await this._handleUpdatePriority(message.priority);
                 break;
             case 'addWatcher':
                 this._handleAddWatcher(message.userId);
@@ -110,7 +135,7 @@ export class CollaborativePanel
         }
     }
 
-    private _handleAddComment(data: { content: string; type: Comment['type']; parentId?: string })
+    private async _handleAddComment(data: { content: string; type: Comment['type']; parentId?: string })
     {
         if (!this._currentItem) return;
 
@@ -121,7 +146,7 @@ export class CollaborativePanel
             return;
         }
 
-        const currentUser = vscode.env.machineId; // Use machine ID as user identifier
+        const currentUser = await this.getCurrentUser(); // Use git username
         const comment = this._currentItem.addComment(currentUser, data.content, data.type, data.parentId);
 
         // Process mentions and send notifications
@@ -159,21 +184,21 @@ export class CollaborativePanel
         this._update();
     }
 
-    private _handleUpdateStatus(status: TypedDirectory['status'])
+    private async _handleUpdateStatus(status: TypedDirectory['status'])
     {
         if (!this._currentItem) return;
 
-        const currentUser = vscode.env.machineId;
+        const currentUser = await this.getCurrentUser();
         this._currentItem.updateStatus(status, currentUser);
         this._update();
         vscode.window.showInformationMessage(`Status updated to ${status}`);
     }
 
-    private _handleUpdatePriority(priority: TypedDirectory['priority'])
+    private async _handleUpdatePriority(priority: TypedDirectory['priority'])
     {
         if (!this._currentItem) return;
 
-        const currentUser = vscode.env.machineId;
+        const currentUser = await this.getCurrentUser();
         this._currentItem.updatePriority(priority, currentUser);
         this._update();
         vscode.window.showInformationMessage(`Priority updated to ${priority}`);
