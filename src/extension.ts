@@ -3,6 +3,8 @@ import { DirectoryProvider } from "./provider/DirectoryProvider";
 import { DirectoryWorker } from "./operator/DirectoryWorker";
 import { DirectoryProviderCommands } from "./commands/CrudCommands";
 import { vsCodeCommands } from "./commands/CrudCommands";
+import { CollaborativePanel } from "./webview/CollaborativePanel";
+import { GitHubService } from "./services/GitHubService";
 
 export function activate(context: vscode.ExtensionContext)
 {
@@ -123,6 +125,56 @@ export function activate(context: vscode.ExtensionContext)
       vscode.commands.registerCommand(
         DirectoryProviderCommands.InjectTeamBookmarks,
         () => directoryProvider.injectTeamBookmarks()
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.OpenCollaboration,
+        (args) =>
+        {
+          if (args && args.resourceUri)
+          {
+            directoryProvider.openCollaborationPanel(args.resourceUri);
+          }
+        }
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.AddComment,
+        (args) => directoryProvider.addQuickComment(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.ManageWatchers,
+        (args) => directoryProvider.manageWatchers(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.UpdateStatus,
+        (args) => directoryProvider.updateStatus(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.UpdatePriority,
+        (args) => directoryProvider.updatePriority(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.ShowActivity,
+        (args) => directoryProvider.showActivityHistory(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.CreatePR,
+        (args) => directoryProvider.createPullRequest(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.LinkPR,
+        (args) => directoryProvider.linkPullRequest(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.ShowGitHub,
+        (args) => directoryProvider.showOnGitHub(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.SetupGitHub,
+        async () =>
+        {
+          const githubService = new GitHubService();
+          await githubService.setupToken();
+        }
       ),
     ]
   );

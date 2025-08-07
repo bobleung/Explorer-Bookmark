@@ -121,6 +121,56 @@
         "command": "directoryprovider/injectteambookmarks",
         "title": "Inject Team Bookmarks",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "directoryprovider/opencollab",
+        "title": "Open Collaboration Panel",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "directoryprovider/addcomment",
+        "title": "Add Comment",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "directoryprovider/managewatchers",
+        "title": "Manage Watchers",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "directoryprovider/updatestatus",
+        "title": "Update Status",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "directoryprovider/updatepriority",
+        "title": "Update Priority",
+        "icon": "$(flame)"
+      },
+      {
+        "command": "directoryprovider/showactivity",
+        "title": "Show Activity History",
+        "icon": "$(history)"
+      },
+      {
+        "command": "directoryprovider/createpr",
+        "title": "Create Pull Request",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "directoryprovider/linkpr",
+        "title": "Link Pull Request",
+        "icon": "$(link)"
+      },
+      {
+        "command": "directoryprovider/showgithub",
+        "title": "Show on GitHub",
+        "icon": "$(github)"
+      },
+      {
+        "command": "directoryprovider/setupgithub",
+        "title": "Setup GitHub Integration",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -159,6 +209,11 @@
           "command": "directoryprovider/injectteambookmarks",
           "when": "view == explorer-bookmark",
           "group": "navigation"
+        },
+        {
+          "command": "directoryprovider/setupgithub",
+          "when": "view == explorer-bookmark",
+          "group": "github"
         }
       ],
       "explorer/context": [
@@ -200,6 +255,116 @@
           "group": "git"
         },
         {
+          "command": "directoryprovider/opencollab",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/addcomment",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/managewatchers",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/updatestatus",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/updatepriority",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/showactivity",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/createpr",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "github"
+        },
+        {
+          "command": "directoryprovider/linkpr",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "github"
+        },
+        {
+          "command": "directoryprovider/showgithub",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "github"
+        },
+        {
+          "command": "directoryprovider/opencollab",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/addcomment",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/managewatchers",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/updatestatus",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/updatepriority",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/showactivity",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "collaboration"
+        },
+        {
+          "command": "directoryprovider/showgitdiff",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/createpr",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "github"
+        },
+        {
+          "command": "directoryprovider/linkpr",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "github"
+        },
+        {
+          "command": "directoryprovider/showgithub",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "github"
+        },
+        {
+          "command": "directoryprovider/viewaisummary",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "ai"
+        },
+        {
+          "command": "directoryprovider/addbookmarkcomment",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "annotations"
+        },
+        {
+          "command": "directoryprovider/addbookmarktags",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "annotations"
+        },
+        {
           "command": "directoryprovider/removesection",
           "when": "view == explorer-bookmark && viewItem == bookmarkSection"
         },
@@ -216,6 +381,36 @@
           "type": "boolean",
           "default": true,
           "description": "Save the current explorer view when closing VS Code"
+        },
+        "folderHub.githubToken": {
+          "type": "string",
+          "default": "",
+          "description": "GitHub Personal Access Token for PR integration and repository operations"
+        },
+        "folderHub.enableCollaborativeFeatures": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable collaborative features like comments, watchers, and activity tracking"
+        },
+        "folderHub.autoRefreshGitInfo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh git information when bookmarks are accessed"
+        },
+        "folderHub.maxActivityHistory": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of activity entries to keep per bookmark"
+        },
+        "folderHub.notificationLevel": {
+          "type": "string",
+          "enum": [
+            "all",
+            "mentions",
+            "none"
+          ],
+          "default": "mentions",
+          "description": "Level of notifications to show for collaborative activities"
         }
       }
     }

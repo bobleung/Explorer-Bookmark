@@ -6,6 +6,9 @@ import { buildTypedDirectory } from "../types/TypedDirectory";
 import { BookmarkSection } from "../types/BookmarkSection";
 import { AIService } from "../services/AIService";
 import { TeamBookmarkService } from "../services/TeamBookmarkService";
+import { GitService } from "../services/GitService";
+import { GitHubService } from "../services/GitHubService";
+import { CommentService } from "../services/CommentService";
 const simpleGit = require('simple-git');
 
 export class DirectoryWorker
@@ -239,7 +242,7 @@ export class DirectoryWorker
                 const summary = await AIService.generateFileSummary(uri);
 
                 // Find and update the bookmark with the new summary
-                const result = this.findBookmarkByUri(uri);
+                const result = this.findBookmarkOrParentByUri(uri);
                 if (result)
                 {
                     result.bookmark.updateAISummary(summary);
@@ -328,7 +331,7 @@ export class DirectoryWorker
 
         if (comment)
         {
-            const result = this.findBookmarkByUri(uri);
+            const result = this.findBookmarkOrParentByUri(uri);
             if (result)
             {
                 result.bookmark.comment = comment;
@@ -350,7 +353,7 @@ export class DirectoryWorker
         {
             const tags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
 
-            const result = this.findBookmarkByUri(uri);
+            const result = this.findBookmarkOrParentByUri(uri);
             if (result)
             {
                 tags.forEach(tag => result.bookmark.addTag(tag));
@@ -1058,5 +1061,276 @@ Keep the summary focused and easy to understand.`;
         }
 
         return null;
+    }
+
+    // New method to find bookmark for subdirectories/files within bookmarked folders
+    private findParentBookmarkByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        for (const section of this.bookmarkSections)
+        {
+            const bookmark = section.directories.find(d =>
+            {
+                let bookmarkPath: string;
+
+                // Handle both relative and absolute path matching
+                if (workspaceRoot && !path.isAbsolute(d.path))
+                {
+                    // Use path.join instead of path.resolve to avoid Windows path issues
+                    bookmarkPath = path.join(workspaceRoot, d.path);
+                }
+                else
+                {
+                    bookmarkPath = d.path;
+                }
+
+                // Check if the target URI is within this bookmarked directory
+                const relativePath = path.relative(bookmarkPath, uri.fsPath);
+
+                // If relativePath doesn't start with '..' then uri is within bookmarkPath
+                return !relativePath.startsWith('..') && relativePath !== '';
+            });
+
+            if (bookmark)
+            {
+                return { section, bookmark };
+            }
+        }
+
+        return null;
+    }
+
+    // Enhanced method that tries both direct match and parent match
+    private findBookmarkOrParentByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null
+    {
+        // First try to find direct match
+        const directMatch = this.findBookmarkByUri(uri);
+        if (directMatch)
+        {
+            return directMatch;
+        }
+
+        // If no direct match, try to find parent bookmark
+        return this.findParentBookmarkByUri(uri);
+    }
+
+    // New Collaborative Methods
+    public async getTypedDirectoryForUri(uri: vscode.Uri): Promise<TypedDirectory | null>
+    {
+        const result = this.findBookmarkOrParentByUri(uri);
+        return result ? result.bookmark : null;
+    }
+
+    public async saveItems(): Promise<void>
+    {
+        this.saveSections();
+    }
+
+    public async addQuickComment(uri: vscode.Uri, comment: string): Promise<void>
+    {
+        const result = this.findBookmarkOrParentByUri(uri);
+        if (result)
+        {
+            const currentUser = vscode.env.machineId;
+            result.bookmark.addComment(currentUser, comment, 'general');
+            this.saveSections();
+        }
+    }
+
+    public async createPullRequest(uri: vscode.Uri): Promise<void>
+    {
+        try
+        {
+            const workspaceFolder = this.workspaceRoot?.[0];
+            if (!workspaceFolder)
+            {
+                vscode.window.showErrorMessage('No workspace folder found');
+                return;
+            }
+
+            const git = simpleGit(workspaceFolder.uri.fsPath);
+            const status = await git.status();
+            const currentBranch = status.current;
+
+            if (!currentBranch)
+            {
+                vscode.window.showErrorMessage('Could not determine current branch');
+                return;
+            }
+
+            // Get PR details from user
+            const title = await vscode.window.showInputBox({
+                prompt: 'Enter PR title',
+                placeHolder: 'Fix: Update bookmark functionality'
+            });
+
+            if (!title) return;
+
+            const body = await vscode.window.showInputBox({
+                prompt: 'Enter PR description',
+                placeHolder: 'Describe your changes...'
+            });
+
+            const targetBranch = await vscode.window.showInputBox({
+                prompt: 'Enter target branch',
+                value: 'main',
+                placeHolder: 'main'
+            });
+
+            if (!targetBranch) return;
+
+            // Here you would typically use GitHub API to create the PR
+            // For now, just open the GitHub PR creation page
+            const repoUrl = await this.getRepositoryUrl();
+            if (repoUrl)
+            {
+                const prUrl = `${repoUrl}/compare/${targetBranch}...${currentBranch}?quick_pull=1&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body || '')}`;
+                vscode.env.openExternal(vscode.Uri.parse(prUrl));
+            }
+        }
+        catch (error)
+        {
+            vscode.window.showErrorMessage(`Error creating PR: ${error}`);
+        }
+    }
+
+    public async linkPullRequest(uri: vscode.Uri, prUrl: string): Promise<void>
+    {
+        const result = this.findBookmarkOrParentByUri(uri);
+        if (result)
+        {
+            // Parse PR info from URL
+            const match = prUrl.match(/github\.com\/([^\/]+)\/([^\/]+)\/pull\/(\d+)/);
+            if (match)
+            {
+                const [, owner, repo, prNumber] = match;
+                const prInfo = {
+                    id: parseInt(prNumber),
+                    title: `PR #${prNumber}`,
+                    url: prUrl,
+                    status: 'open' as const,
+                    author: 'unknown',
+                    created: new Date(),
+                    updated: new Date(),
+                    targetBranch: 'main',
+                    sourceBranch: 'feature'
+                };
+
+                result.bookmark.addRelatedPR(prInfo);
+                this.saveSections();
+                vscode.window.showInformationMessage(`Linked PR #${prNumber} to bookmark`);
+            }
+            else
+            {
+                vscode.window.showErrorMessage('Invalid GitHub PR URL');
+            }
+        }
+    }
+
+    public async showOnGitHub(uri: vscode.Uri): Promise<void>
+    {
+        try
+        {
+            const repoUrl = await this.getRepositoryUrl();
+            if (repoUrl)
+            {
+                // Get the relative path and open on GitHub
+                const workspaceFolder = this.workspaceRoot?.[0];
+                if (workspaceFolder)
+                {
+                    const relativePath = path.relative(workspaceFolder.uri.fsPath, uri.fsPath);
+                    // Convert Windows backslashes to forward slashes for URL
+                    const urlPath = relativePath.replace(/\\/g, '/');
+
+                    // Get the current branch or default to master
+                    let branch = 'master'; // Default fallback
+                    try
+                    {
+                        const git = simpleGit(workspaceFolder.uri.fsPath);
+
+                        // First, try to get the default branch from remote HEAD
+                        try
+                        {
+                            const remoteInfo = await git.raw(['symbolic-ref', 'refs/remotes/origin/HEAD']);
+                            if (remoteInfo)
+                            {
+                                const match = remoteInfo.match(/refs\/remotes\/origin\/(.+)/);
+                                if (match)
+                                {
+                                    branch = match[1].trim();
+                                }
+                            }
+                        }
+                        catch (remoteError)
+                        {
+                            // If that fails, check what branches exist
+                            const branches = await git.branch(['-r']);
+                            const defaultBranch = branches.all.find((b: string) =>
+                                b.includes('origin/master') || b.includes('origin/main')
+                            );
+                            if (defaultBranch)
+                            {
+                                branch = defaultBranch.includes('master') ? 'master' : 'main';
+                            }
+                        }
+                    }
+                    catch (gitError)
+                    {
+                        console.warn('Could not determine branch, using master:', gitError);
+                        branch = 'master';
+                    } const githubUrl = `${repoUrl}/blob/${branch}/${urlPath}`;
+                    vscode.env.openExternal(vscode.Uri.parse(githubUrl));
+                }
+                else
+                {
+                    vscode.env.openExternal(vscode.Uri.parse(repoUrl));
+                }
+            }
+            else
+            {
+                vscode.window.showErrorMessage('Could not determine GitHub repository URL');
+            }
+        }
+        catch (error)
+        {
+            vscode.window.showErrorMessage(`Error opening GitHub: ${error}`);
+        }
+    }
+
+    private async getRepositoryUrl(): Promise<string | null>
+    {
+        try
+        {
+            const workspaceFolder = this.workspaceRoot?.[0];
+            if (!workspaceFolder) return null;
+
+            const git = simpleGit(workspaceFolder.uri.fsPath);
+            const remotes = await git.getRemotes(true);
+            const origin = remotes.find((r: any) => r.name === 'origin');
+
+            if (origin && origin.refs.fetch)
+            {
+                // Convert SSH to HTTPS URL if needed
+                let url = origin.refs.fetch;
+                if (url.startsWith('git@github.com:'))
+                {
+                    url = url.replace('git@github.com:', 'https://github.com/');
+                }
+                if (url.endsWith('.git'))
+                {
+                    url = url.slice(0, -4);
+                }
+                return url;
+            }
+
+            return null;
+        }
+        catch (error)
+        {
+            return null;
+        }
     }
 }
