@@ -99,6 +99,26 @@ export class DirectoryProvider
     await this.directoryOperator.showGitDiff(uri);
   }
 
+  async cherryPickChanges(uri: vscode.Uri)
+  {
+    await this.directoryOperator.cherryPickChanges(uri);
+  }
+
+  async gitAddFile(uri: vscode.Uri)
+  {
+    await this.directoryOperator.gitAddFile(uri);
+  }
+
+  async gitCommitFile(uri: vscode.Uri)
+  {
+    await this.directoryOperator.gitCommitFile(uri);
+  }
+
+  async gitStashFile(uri: vscode.Uri)
+  {
+    await this.directoryOperator.gitStashFile(uri);
+  }
+
   async exportTeamBookmarks()
   {
     await this.directoryOperator.exportTeamBookmarks();
@@ -147,66 +167,6 @@ export class DirectoryProvider
     {
       await this.directoryOperator.addQuickComment(uri, comment);
       this.refresh();
-    }
-  }
-
-  async manageWatchers(uri: vscode.Uri)
-  {
-    const item = await this.directoryOperator.getTypedDirectoryForUri(uri);
-    if (!item) return;
-
-    const action = await vscode.window.showQuickPick([
-      { label: 'Add Watcher', description: 'Add a user to watch this bookmark' },
-      { label: 'Remove Watcher', description: 'Remove a user from watching this bookmark' },
-      { label: 'View Watchers', description: 'View all current watchers' }
-    ], {
-      placeHolder: 'Choose watcher action'
-    });
-
-    if (!action) return;
-
-    switch (action.label)
-    {
-      case 'Add Watcher':
-        const userId = await vscode.window.showInputBox({
-          placeHolder: 'Enter user ID',
-          prompt: 'User ID to add as watcher'
-        });
-        if (userId)
-        {
-          item.addWatcher(userId);
-          await this.directoryOperator.saveItems();
-          this.refresh();
-        }
-        break;
-
-      case 'Remove Watcher':
-        if (item.watchers.length === 0)
-        {
-          vscode.window.showInformationMessage('No watchers to remove');
-          return;
-        }
-        const watcherToRemove = await vscode.window.showQuickPick(
-          item.watchers.map((w: string) => ({ label: w, description: 'Remove this watcher' })),
-          { placeHolder: 'Select watcher to remove' }
-        );
-        if (watcherToRemove)
-        {
-          item.removeWatcher(watcherToRemove.label);
-          await this.directoryOperator.saveItems();
-          this.refresh();
-        }
-        break;
-
-      case 'View Watchers':
-        if (item.watchers.length === 0)
-        {
-          vscode.window.showInformationMessage('No watchers for this bookmark');
-        } else
-        {
-          vscode.window.showInformationMessage(`Watchers: ${item.watchers.join(', ')}`);
-        }
-        break;
     }
   }
 

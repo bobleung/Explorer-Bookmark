@@ -326,7 +326,8 @@ export class CollaborativePanel
     private _update()
     {
         const webview = this._panel.webview;
-        this._panel.title = `Collaboration: ${this._currentItem?.path || 'Unknown'}`;
+        const itemName = this._currentItem?.path.split('/').pop() || this._currentItem?.path || 'Unknown';
+        this._panel.title = `🤝 Collaboration: ${itemName}`;
         this._panel.webview.html = this._getHtmlForWebview(webview);
     }
 

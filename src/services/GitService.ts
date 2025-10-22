@@ -137,7 +137,33 @@ export class GitService
     {
         try
         {
-            const relativePath = path.relative(this.workspaceRoot, filePath);
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                // Convert absolute to relative
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                // Validate path is within workspace
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+            }
+            else
+            {
+                // Already relative, use directly
+                relativePath = filePath;
+
+                // Basic validation for relative paths
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                }
+            }
+
             const log = await this.git.log(['--max-count=' + maxCount, '--', relativePath]);
 
             const commits: CommitInfo[] = log.all.map(commit => ({
@@ -163,7 +189,33 @@ export class GitService
     {
         try
         {
-            const relativePath = path.relative(this.workspaceRoot, filePath);
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                // Convert absolute to relative
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                // Validate path is within workspace
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+            }
+            else
+            {
+                // Already relative, use directly
+                relativePath = filePath;
+
+                // Basic validation for relative paths
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                }
+            }
+
             const range = fromCommit && toCommit ? `${fromCommit}..${toCommit}` :
                 fromCommit ? `${fromCommit}..HEAD` :
                     'HEAD~1..HEAD';
@@ -205,6 +257,13 @@ export class GitService
             if (filePath)
             {
                 const relativePath = path.relative(this.workspaceRoot, filePath);
+
+                // Check if the file is within the workspace/repository
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+
                 args.push('--', relativePath);
             }
 
@@ -213,23 +272,181 @@ export class GitService
         } catch (error)
         {
             console.error('Error getting staged changes:', error);
+
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('outside') || errorMessage.includes('repository')) 
+            {
+                return `Error: The selected file is outside the current Git repository.\nRepository: ${this.workspaceRoot}\nFile: ${filePath || 'unknown'}`;
+            }
+
+            return '';
+        }
+    }
+
+    async getWorkingDirectoryChanges(filePath?: string): Promise<string>
+    {
+        try
+        {
+            const args = [];
+            if (filePath)
+            {
+                let relativePath: string;
+
+                // Check if the input is already a relative path or absolute path
+                if (path.isAbsolute(filePath))
+                {
+                    // It's an absolute path, make it relative to workspace
+                    const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                    const normalizedFile = path.resolve(filePath);
+                    relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                    // Debug: Check if path calculation is correct
+                    console.log('GitService processing absolute path:', {
+                        file: path.basename(filePath),
+                        workspace: path.basename(this.workspaceRoot),
+                        relativePath: relativePath,
+                        isValid: !relativePath.startsWith('..')
+                    });
+
+                    // If the relative path starts with .., the file is outside the repository
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+                else
+                {
+                    // It's already a relative path, use it directly
+                    relativePath = filePath;
+
+                    // Debug: Using relative path directly
+                    console.log('GitService processing relative path:', {
+                        relativePath: relativePath,
+                        isValid: !relativePath.startsWith('..')
+                    });
+
+                    // Basic check: if it starts with .., it might be trying to go outside
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`Relative path '${filePath}' appears to go outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+
+                // Use the relative path for git operations
+                args.push('--', relativePath);
+            }
+
+            const diff = await this.git.diff(args);
+            return diff;
+        } catch (error)
+        {
+            console.error('Error getting working directory changes:', error);
+
+            // If the file is outside repository, return a meaningful message
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('outside') || errorMessage.includes('repository')) 
+            {
+                return `Error: The selected file is outside the current Git repository.\nRepository: ${this.workspaceRoot}\nFile: ${filePath || 'unknown'}`;
+            }
+
             return '';
         }
     }
 
     // Remote Operations
-    async compareWithRemote(localBranch?: string, remoteBranch?: string): Promise<string>
+    async compareWithRemote(localBranch?: string, remoteBranch?: string, filePath?: string): Promise<string>
     {
         try
         {
             const current = localBranch || await this.getCurrentBranch();
             const remote = remoteBranch || `origin/${current}`;
 
-            const diff = await this.git.diff([`${remote}..${current}`]);
+            const args = [`${remote}..${current}`];
+
+            if (filePath)
+            {
+                let relativePath: string;
+
+                if (path.isAbsolute(filePath))
+                {
+                    // Convert absolute to relative
+                    const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                    const normalizedFile = path.resolve(filePath);
+                    relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                    // Validate path is within workspace
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+                else
+                {
+                    // Already relative, use directly
+                    relativePath = filePath;
+
+                    // Basic validation for relative paths
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                    }
+                }
+
+                args.push('--', relativePath);
+            }
+
+            const diff = await this.git.diff(args);
             return diff;
         } catch (error)
         {
             console.error('Error comparing with remote:', error);
+            return '';
+        }
+    }
+
+    async compareBranches(branch1: string, branch2: string, filePath?: string): Promise<string>
+    {
+        try
+        {
+            const args = [`${branch1}..${branch2}`];
+
+            if (filePath)
+            {
+                let relativePath: string;
+
+                if (path.isAbsolute(filePath))
+                {
+                    // Convert absolute to relative
+                    const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                    const normalizedFile = path.resolve(filePath);
+                    relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                    // Validate path is within workspace
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+                else
+                {
+                    // Already relative, use directly
+                    relativePath = filePath;
+
+                    // Basic validation for relative paths
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                    }
+                }
+
+                args.push('--', relativePath);
+            }
+
+            const diff = await this.git.diff(args);
+            return diff;
+        } catch (error)
+        {
+            console.error('Error comparing branches:', error);
             return '';
         }
     }
@@ -503,6 +720,542 @@ export class GitService
         {
             console.error('Error getting git user:', error);
             return vscode.env.machineId.substring(0, 8);
+        }
+    }
+
+    // Cherry-pick functionality
+    async getCommitsFromBranch(branchName: string, filePath?: string, maxCount: number = 20): Promise<CommitInfo[]>
+    {
+        try
+        {
+            const args = ['--max-count=' + maxCount, branchName];
+
+            if (filePath)
+            {
+                let relativePath: string;
+
+                if (path.isAbsolute(filePath))
+                {
+                    // Convert absolute to relative
+                    const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                    const normalizedFile = path.resolve(filePath);
+                    relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                    // Validate path is within workspace
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+                else
+                {
+                    // Already relative, use directly
+                    relativePath = filePath;
+
+                    // Basic validation for relative paths
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                    }
+                }
+
+                args.push('--', relativePath);
+            }
+
+            const log = await this.git.log(args);
+
+            return log.all.map(commit => ({
+                hash: commit.hash,
+                message: commit.message,
+                author: commit.author_name,
+                date: new Date(commit.date),
+                files: commit.diff?.files?.map(f => f.file) || []
+            }));
+        } catch (error)
+        {
+            console.error('Error getting commits from branch:', error);
+            return [];
+        }
+    }
+
+    async cherryPickCommit(commitHash: string, filePath?: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            if (filePath)
+            {
+                // Cherry-pick specific file from commit
+                let relativePath: string;
+
+                if (path.isAbsolute(filePath))
+                {
+                    // Convert absolute to relative
+                    const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                    const normalizedFile = path.resolve(filePath);
+                    relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                    // Validate path is within workspace
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+                else
+                {
+                    // Already relative, use directly
+                    relativePath = filePath;
+
+                    // Basic validation for relative paths
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                    }
+                }
+
+                // Use git show to get the file content from the specific commit
+                const fileContent = await this.git.show([`${commitHash}:${relativePath}`]);
+
+                // Write the content to the file
+                const fs = require('fs');
+                const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.workspaceRoot, relativePath);
+                fs.writeFileSync(fullPath, fileContent);
+
+                return {
+                    success: true,
+                    message: `Successfully cherry-picked file '${path.basename(relativePath)}' from commit ${commitHash.substring(0, 8)}`
+                };
+            }
+            else
+            {
+                // Cherry-pick entire commit
+                await this.git.raw(['cherry-pick', commitHash]);
+
+                return {
+                    success: true,
+                    message: `Successfully cherry-picked commit ${commitHash.substring(0, 8)}`
+                };
+            }
+        } catch (error: any)
+        {
+            console.error('Error cherry-picking commit:', error);
+
+            // Check if it's a conflict
+            if (error.message && error.message.includes('conflict'))
+            {
+                return {
+                    success: false,
+                    message: `Cherry-pick conflict detected. Please resolve conflicts manually for commit ${commitHash.substring(0, 8)}`
+                };
+            }
+
+            return {
+                success: false,
+                message: `Failed to cherry-pick commit ${commitHash.substring(0, 8)}: ${error.message || error}`
+            };
+        }
+    }
+
+    async cherryPickRange(fromCommit: string, toCommit: string, filePath?: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            if (filePath)
+            {
+                // For file-specific range, we need to apply each commit individually
+                const commits = await this.git.log([`${fromCommit}..${toCommit}`, '--reverse']);
+                const results: string[] = [];
+
+                for (const commit of commits.all)
+                {
+                    const result = await this.cherryPickCommit(commit.hash, filePath);
+                    if (result.success)
+                    {
+                        results.push(`✓ ${commit.hash.substring(0, 8)}: ${commit.message.split('\n')[0]}`);
+                    }
+                    else
+                    {
+                        results.push(`✗ ${commit.hash.substring(0, 8)}: ${result.message}`);
+                    }
+                }
+
+                return {
+                    success: true,
+                    message: `Cherry-pick range results:\n${results.join('\n')}`
+                };
+            }
+            else
+            {
+                // Cherry-pick range of commits
+                await this.git.raw(['cherry-pick', `${fromCommit}..${toCommit}`]);
+
+                return {
+                    success: true,
+                    message: `Successfully cherry-picked commit range ${fromCommit.substring(0, 8)}..${toCommit.substring(0, 8)}`
+                };
+            }
+        } catch (error: any)
+        {
+            console.error('Error cherry-picking range:', error);
+
+            return {
+                success: false,
+                message: `Failed to cherry-pick range ${fromCommit.substring(0, 8)}..${toCommit.substring(0, 8)}: ${error.message || error}`
+            };
+        }
+    }
+
+    async abortCherryPick(): Promise<boolean>
+    {
+        try
+        {
+            await this.git.raw(['cherry-pick', '--abort']);
+            return true;
+        } catch (error)
+        {
+            console.error('Error aborting cherry-pick:', error);
+            return false;
+        }
+    }
+
+    async continueCherryPick(): Promise<boolean>
+    {
+        try
+        {
+            await this.git.raw(['cherry-pick', '--continue']);
+            return true;
+        } catch (error)
+        {
+            console.error('Error continuing cherry-pick:', error);
+            return false;
+        }
+    }
+
+    // Git Add, Commit, and File-Specific Stash operations
+    async stageFile(filePath: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                // Convert absolute to relative
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                // Validate path is within workspace
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+            }
+            else
+            {
+                // Already relative, use directly
+                relativePath = filePath;
+
+                // Basic validation for relative paths
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                }
+            }
+
+            // Check if file has any changes before staging
+            const statusBefore = await this.git.status();
+            const normalizedPath = relativePath.replace(/\\/g, '/');
+
+            // Check if file appears in any status array
+            const allFilesBefore = [
+                ...statusBefore.modified,
+                ...statusBefore.not_added,
+                ...statusBefore.deleted,
+                ...statusBefore.created,
+                ...statusBefore.conflicted
+            ];
+
+            const hasChanges = allFilesBefore.some(file =>
+                file === normalizedPath ||
+                file === relativePath
+            );
+
+            if (!hasChanges)
+            {
+                // Check if file is already staged
+                if (statusBefore.staged.includes(normalizedPath) || statusBefore.staged.includes(relativePath))
+                {
+                    return {
+                        success: true,
+                        message: `'${path.basename(relativePath)}' is already staged`
+                    };
+                }
+
+                return {
+                    success: false,
+                    message: `No changes to stage for '${path.basename(relativePath)}'`
+                };
+            }
+
+            await this.git.add(relativePath);
+
+            return {
+                success: true,
+                message: `Successfully staged '${path.basename(relativePath)}'`
+            };
+        } catch (error: any)
+        {
+            console.error('Error staging file:', error);
+            return {
+                success: false,
+                message: `Failed to stage file: ${error.message || error}`
+            };
+        }
+    }
+
+    async unstageFile(filePath: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                // Convert absolute to relative
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                // Validate path is within workspace
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+            }
+            else
+            {
+                // Already relative, use directly
+                relativePath = filePath;
+
+                // Basic validation for relative paths
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                }
+            }
+
+            await this.git.reset(['HEAD', '--', relativePath]);
+
+            return {
+                success: true,
+                message: `Successfully unstaged '${path.basename(relativePath)}'`
+            };
+        } catch (error: any)
+        {
+            console.error('Error unstaging file:', error);
+            return {
+                success: false,
+                message: `Failed to unstage file: ${error.message || error}`
+            };
+        }
+    }
+
+    async commitFile(filePath: string, message: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                // Convert absolute to relative
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                // Validate path is within workspace
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+            }
+            else
+            {
+                // Already relative, use directly
+                relativePath = filePath;
+
+                // Basic validation for relative paths
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                }
+            }
+
+            // Stage the file first
+            await this.git.add(relativePath);
+
+            // Commit the file
+            await this.git.commit(message, [relativePath]);
+
+            return {
+                success: true,
+                message: `Successfully committed '${path.basename(relativePath)}'`
+            };
+        } catch (error: any)
+        {
+            console.error('Error committing file:', error);
+            return {
+                success: false,
+                message: `Failed to commit file: ${error.message || error}`
+            };
+        }
+    }
+
+    async commitStagedChanges(message: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            const status = await this.git.status();
+
+            if (status.staged.length === 0)
+            {
+                return {
+                    success: false,
+                    message: 'No staged changes to commit'
+                };
+            }
+
+            await this.git.commit(message);
+
+            return {
+                success: true,
+                message: `Successfully committed ${status.staged.length} file(s)`
+            };
+        } catch (error: any)
+        {
+            console.error('Error committing staged changes:', error);
+            return {
+                success: false,
+                message: `Failed to commit: ${error.message || error}`
+            };
+        }
+    }
+
+    async stashFile(filePath: string, message?: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                // Convert absolute to relative
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                // Validate path is within workspace
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                }
+            }
+            else
+            {
+                // Already relative, use directly
+                relativePath = filePath;
+
+                // Basic validation for relative paths
+                if (relativePath.startsWith('..'))
+                {
+                    throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                }
+            }
+
+            // Git doesn't have a built-in "stash single file" command
+            // We'll use a workaround: stage everything else, then stash --keep-index
+
+            // Save current changes
+            const currentChanges = await this.git.diff();
+
+            // Stage the specific file
+            await this.git.add(relativePath);
+
+            // Stash with --keep-index to keep staged changes (our file)
+            const stashMessage = message || `Stashed changes for ${path.basename(relativePath)}`;
+            await this.git.stash(['push', '--keep-index', '-m', stashMessage, '--', relativePath]);
+
+            return {
+                success: true,
+                message: `Successfully stashed '${path.basename(relativePath)}'`
+            };
+        } catch (error: any)
+        {
+            console.error('Error stashing file:', error);
+            return {
+                success: false,
+                message: `Failed to stash file: ${error.message || error}`
+            };
+        }
+    }
+
+    async getFileStatus(filePath: string): Promise<{ isModified: boolean, isStaged: boolean, isUntracked: boolean }>
+    {
+        try
+        {
+            let relativePath: string;
+
+            if (path.isAbsolute(filePath))
+            {
+                const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                const normalizedFile = path.resolve(filePath);
+                relativePath = path.relative(normalizedWorkspace, normalizedFile);
+            }
+            else
+            {
+                relativePath = filePath;
+            }
+
+            const status = await this.git.status();
+
+            // Normalize path separators for comparison (Windows uses backslashes, git uses forward slashes)
+            const normalizedPath = relativePath.replace(/\\/g, '/');
+
+            // Check in various status arrays
+            const isModified = status.modified.includes(normalizedPath) ||
+                status.modified.includes(relativePath);
+
+            const isStaged = status.staged.includes(normalizedPath) ||
+                status.staged.includes(relativePath);
+
+            const isUntracked = status.not_added.includes(normalizedPath) ||
+                status.not_added.includes(relativePath);
+
+            // Also check if file appears in any of the status arrays (renamed, deleted, etc.)
+            const allFiles = [
+                ...status.modified,
+                ...status.not_added,
+                ...status.deleted,
+                ...status.created,
+                ...status.renamed.map((r: any) => r.to || r),
+                ...status.staged
+            ];
+
+            const hasAnyChanges = allFiles.some(file =>
+                file === normalizedPath ||
+                file === relativePath ||
+                (typeof file === 'object' && (file.path === normalizedPath || file.path === relativePath))
+            );
+
+            return {
+                isModified: isModified || hasAnyChanges,
+                isStaged,
+                isUntracked
+            };
+        } catch (error)
+        {
+            console.error('Error getting file status:', error);
+            return { isModified: false, isStaged: false, isUntracked: false };
         }
     }
 }

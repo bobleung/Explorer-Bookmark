@@ -25,7 +25,6 @@ export enum DirectoryProviderCommands
     // New Collaborative Commands
     OpenCollaboration = 'directoryprovider/opencollab',
     AddComment = 'directoryprovider/addcomment',
-    ManageWatchers = 'directoryprovider/managewatchers',
     UpdateStatus = 'directoryprovider/updatestatus',
     UpdatePriority = 'directoryprovider/updatepriority',
     ShowActivity = 'directoryprovider/showactivity',
@@ -33,4 +32,10 @@ export enum DirectoryProviderCommands
     LinkPR = 'directoryprovider/linkpr',
     ShowGitHub = 'directoryprovider/showgithub',
     SetupGitHub = 'directoryprovider/setupgithub',
+    // Cherry-pick Commands
+    CherryPickChanges = 'directoryprovider/cherrypickchanges',
+    // Git Operations Commands
+    GitAddFile = 'directoryprovider/gitaddfile',
+    GitCommitFile = 'directoryprovider/gitcommitfile',
+    GitStashFile = 'directoryprovider/gitstashfile',
 };

@@ -1,11 +1,10 @@
-# Explorer Bookmark for VS Code
+# 🔖 Explorer Bookmark for VS Code
 
-Ever got lost in a huge repo, with no imaginable way back to the files you originally worked on?
-<br />
-Say goodbye to endless scrolling trying to find those files after losing where they were.
-<br />
-<br />
-Explorer Bookmark succeeds in making a quick-access explorer view. Adding often used folders or files to this cache-like structure makes traversing big projects just a bit less of a hassle.
+**Intelligent bookmarking system with Git integration, AI-powered analysis, and team collaboration features.**
+
+Ever got lost in a huge repo, with no imaginable way back to the files you originally worked on? Say goodbye to endless scrolling trying to find those files after losing where they were.
+
+Explorer Bookmark provides a comprehensive solution for managing important files and folders in large projects, enhanced with modern development workflow features including Git integration, AI-powered code analysis, and seamless team collaboration capabilities.
 
 ![gif](docs/demonstration.gif?raw=true)
 

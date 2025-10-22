@@ -75,13 +75,33 @@ export class DirectoryWorker
     {
         if (uri)
         {
+            // Check if we have a workspace
+            const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+                ? this.workspaceRoot[0].uri.fsPath
+                : undefined;
+
+            // If we have a workspace, check if the file is within it
+            if (workspaceRoot)
+            {
+                const relativePath = path.relative(workspaceRoot, uri.fsPath);
+                if (relativePath.startsWith('..'))
+                {
+                    const result = await vscode.window.showWarningMessage(
+                        `The selected file is outside the current workspace and may not work properly with Git features.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}\n\nDo you want to bookmark it anyway?`,
+                        'Yes, Bookmark It', 'Cancel'
+                    );
+
+                    if (result !== 'Yes, Bookmark It')
+                    {
+                        return;
+                    }
+                }
+            }
+
             const currentUser = await this.getCurrentUser();
             const typedDirectory = await buildTypedDirectory(uri, undefined, undefined, currentUser);
 
             // Convert to relative path for storage if we have a workspace root
-            const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
-                ? this.workspaceRoot[0].uri.fsPath
-                : undefined;
 
             if (workspaceRoot && path.isAbsolute(typedDirectory.path))
             {
@@ -377,59 +397,420 @@ export class DirectoryWorker
             return;
         }
 
+        // Check if the file is within the workspace
+        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        if (relativePath.startsWith('..'))
+        {
+            vscode.window.showErrorMessage(
+                `Cannot show Git diff: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+            );
+            return;
+        }
+
         try
         {
-            const git = simpleGit(workspaceRoot);
+            const gitService = new GitService(workspaceRoot);
+
+            // First check if this is a git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
 
             // Get the current branch
-            const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
+            const currentBranch = await gitService.getCurrentBranch();
 
-            // Get remote branches
-            const remotes = await git.getRemotes(true);
-            if (remotes.length === 0)
-            {
-                vscode.window.showErrorMessage('No remote repositories found.');
-                return;
-            }
+            // Give user options for what type of diff to show
+            const diffOptions = [
+                {
+                    label: 'Working Directory vs HEAD',
+                    description: 'Show uncommitted changes',
+                    option: 'working'
+                },
+                {
+                    label: 'Local vs Remote',
+                    description: `Compare with origin/${currentBranch}`,
+                    option: 'remote'
+                },
+                {
+                    label: 'Between Branches',
+                    description: 'Choose two branches to compare',
+                    option: 'branches'
+                },
+                {
+                    label: 'File History',
+                    description: 'Show recent commits affecting this file',
+                    option: 'history'
+                }
+            ];
 
-            // Assume origin as default remote, or use the first available
-            const remoteName = remotes.find((r: any) => r.name === 'origin')?.name || remotes[0].name;
-            const remoteBranch = `${remoteName}/${currentBranch}`;
+            const selectedOption = await vscode.window.showQuickPick(diffOptions, {
+                placeHolder: 'Choose diff type'
+            });
 
-            // Get relative path for the file
-            const relativePath = path.relative(workspaceRoot, uri.fsPath);
+            if (!selectedOption) return;
 
-            // Check if the file exists in both local and remote
-            const diffResult = await git.diff([remoteBranch, '--', relativePath]);
-
-            if (!diffResult || diffResult.trim() === '')
-            {
-                vscode.window.showInformationMessage('No differences found between local and remote for this file.');
-                return;
-            }
-
-            // Ask user what they want to do with the diff
-            const action = await vscode.window.showInformationMessage(
-                'Git diff found between local and remote versions.',
-                'View Diff', 'AI Summarize Diff', 'Cancel'
-            );
-
-            switch (action)
-            {
-                case 'View Diff':
-                    await this.showDiffInEditor(diffResult, relativePath, remoteBranch);
-                    break;
-                case 'AI Summarize Diff':
-                    await this.generateAIDiffSummary(diffResult, relativePath, remoteBranch);
-                    break;
-                default:
-                    return;
-            }
+            await this.handleGitDiffOption(uri, gitService, selectedOption.option, currentBranch);
 
         } catch (error)
         {
             console.error('Git diff failed:', error);
             vscode.window.showErrorMessage(`Failed to get git diff: ${error}`);
+        }
+    }
+
+    public async cherryPickChanges(uri: vscode.Uri): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Cherry-pick requires a workspace.');
+            return;
+        }
+
+        // Check if the file is within the workspace
+        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        if (relativePath.startsWith('..'))
+        {
+            vscode.window.showErrorMessage(
+                `Cannot cherry-pick: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+            );
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // First check if this is a git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Get all branches
+            const branches = await gitService.getAllBranches();
+            const branchNames = branches.map(b => b.name).filter(name => !name.startsWith('remotes/'));
+            const currentBranch = await gitService.getCurrentBranch();
+
+            // Filter out current branch
+            const otherBranches = branchNames.filter(name => name !== currentBranch);
+
+            if (otherBranches.length === 0)
+            {
+                vscode.window.showInformationMessage('No other branches available for cherry-picking.');
+                return;
+            }
+
+            // Let user select source branch
+            const sourceBranch = await vscode.window.showQuickPick(otherBranches, {
+                placeHolder: 'Select branch to cherry-pick from'
+            });
+
+            if (!sourceBranch) return;
+
+            // Give user options for cherry-pick type
+            const cherryPickOptions = [
+                {
+                    label: 'Cherry-pick File Changes',
+                    description: 'Apply changes to this specific file from selected commits',
+                    option: 'file'
+                },
+                {
+                    label: 'Cherry-pick Entire Commits',
+                    description: 'Apply entire commits (all files changed in those commits)',
+                    option: 'commits'
+                }
+            ];
+
+            const selectedOption = await vscode.window.showQuickPick(cherryPickOptions, {
+                placeHolder: 'Choose cherry-pick type'
+            });
+
+            if (!selectedOption) return;
+
+            await this.handleCherryPickOption(uri, gitService, sourceBranch, selectedOption.option);
+
+        } catch (error)
+        {
+            console.error('Cherry-pick failed:', error);
+            vscode.window.showErrorMessage(`Failed to cherry-pick: ${error}`);
+        }
+    }
+
+    public async gitAddFile(uri: vscode.Uri): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git add requires a workspace.');
+            return;
+        }
+
+        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        if (relativePath.startsWith('..'))
+        {
+            vscode.window.showErrorMessage(
+                `Cannot stage file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+            );
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Get file status first
+            const status = await gitService.getFileStatus(uri.fsPath);
+
+            if (status.isStaged)
+            {
+                const action = await vscode.window.showInformationMessage(
+                    `'${path.basename(uri.fsPath)}' is already staged. What would you like to do?`,
+                    'Unstage', 'Cancel'
+                );
+
+                if (action === 'Unstage')
+                {
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: "Unstaging file...",
+                        cancellable: false
+                    }, async () =>
+                    {
+                        const result = await gitService.unstageFile(uri.fsPath);
+
+                        if (result.success)
+                        {
+                            vscode.window.showInformationMessage(result.message);
+                        }
+                        else
+                        {
+                            vscode.window.showErrorMessage(result.message);
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Try to stage the file even if status detection is uncertain
+            // Git will handle the case where there are no changes
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Staging file...",
+                cancellable: false
+            }, async () =>
+            {
+                const result = await gitService.stageFile(uri.fsPath);
+
+                if (result.success)
+                {
+                    vscode.window.showInformationMessage(result.message);
+                }
+                else
+                {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git add failed:', error);
+            vscode.window.showErrorMessage(`Failed to stage file: ${error}`);
+        }
+    }
+
+    public async gitCommitFile(uri: vscode.Uri): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git commit requires a workspace.');
+            return;
+        }
+
+        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        if (relativePath.startsWith('..'))
+        {
+            vscode.window.showErrorMessage(
+                `Cannot commit file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+            );
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Get file status
+            const status = await gitService.getFileStatus(uri.fsPath);
+
+            if (!status.isModified && !status.isUntracked && !status.isStaged)
+            {
+                vscode.window.showInformationMessage(`No changes to commit for '${path.basename(uri.fsPath)}'`);
+                return;
+            }
+
+            // Ask for commit message
+            const commitMessage = await vscode.window.showInputBox({
+                prompt: `Enter commit message for '${path.basename(uri.fsPath)}'`,
+                placeHolder: 'feat: add new feature',
+                validateInput: (value) =>
+                {
+                    if (!value || value.trim().length === 0)
+                    {
+                        return 'Commit message cannot be empty';
+                    }
+                    return null;
+                }
+            });
+
+            if (!commitMessage) return;
+
+            // Commit the file
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Committing file...",
+                cancellable: false
+            }, async () =>
+            {
+                const result = await gitService.commitFile(uri.fsPath, commitMessage);
+
+                if (result.success)
+                {
+                    vscode.window.showInformationMessage(result.message);
+                }
+                else
+                {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git commit failed:', error);
+            vscode.window.showErrorMessage(`Failed to commit file: ${error}`);
+        }
+    }
+
+    public async gitStashFile(uri: vscode.Uri): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git stash requires a workspace.');
+            return;
+        }
+
+        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        if (relativePath.startsWith('..'))
+        {
+            vscode.window.showErrorMessage(
+                `Cannot stash file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+            );
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Get file status
+            const status = await gitService.getFileStatus(uri.fsPath);
+
+            if (!status.isModified && !status.isUntracked)
+            {
+                vscode.window.showInformationMessage(`No changes to stash for '${path.basename(uri.fsPath)}'`);
+                return;
+            }
+
+            // Ask for stash message (optional)
+            const stashMessage = await vscode.window.showInputBox({
+                prompt: `Enter stash message for '${path.basename(uri.fsPath)}' (optional)`,
+                placeHolder: 'WIP: temporary changes'
+            });
+
+            // Confirm stash action
+            const confirmation = await vscode.window.showWarningMessage(
+                `Stash changes for '${path.basename(uri.fsPath)}'? This will save the changes and revert the file to the last commit.`,
+                'Yes, Stash', 'Cancel'
+            );
+
+            if (confirmation !== 'Yes, Stash') return;
+
+            // Stash the file
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Stashing file...",
+                cancellable: false
+            }, async () =>
+            {
+                const result = await gitService.stashFile(uri.fsPath, stashMessage || undefined);
+
+                if (result.success)
+                {
+                    vscode.window.showInformationMessage(result.message);
+                }
+                else
+                {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git stash failed:', error);
+            vscode.window.showErrorMessage(`Failed to stash file: ${error}`);
         }
     }
 
@@ -896,31 +1277,114 @@ Keep the summary focused and easy to understand.`;
                 sectionId
             );
 
-            // Enhanced tooltip with metadata
-            let tooltip = file.fsPath;
+            // Enhanced label with visual indicators
+            let displayLabel = path.basename(dir.path);
+            let visualIndicators = '';
+
+            // Priority indicators
+            if (dir.priority === 'critical') visualIndicators += '🔥 ';
+            else if (dir.priority === 'high') visualIndicators += '⚡ ';
+            else if (dir.priority === 'low') visualIndicators += '⬇️ ';
+
+            // Status indicators
+            if (dir.status === 'in-review') visualIndicators += '👀 ';
+            else if (dir.status === 'completed') visualIndicators += '✅ ';
+            else if (dir.status === 'archived') visualIndicators += '📦 ';
+
+            // Feature indicators
+            if (dir.comments.length > 0) visualIndicators += `💬${dir.comments.length} `;
+            if (dir.tags && dir.tags.length > 0) visualIndicators += '🏷️ ';
+            if (dir.aiSummary) visualIndicators += '🤖 ';
+            if (dir.watchers.length > 0) visualIndicators += `👁️${dir.watchers.length} `;
+            if (dir.relatedPRs.length > 0) visualIndicators += `🔗${dir.relatedPRs.length} `;
+
+            // Git status indicators
+            if (dir.gitInfo?.hasLocalChanges) visualIndicators += '🔄 ';
+            if (dir.gitInfo?.conflictStatus === 'conflicts') visualIndicators += '⚠️ ';
+
+            // Update the item label through the constructor property
+            const enhancedLabel = visualIndicators + displayLabel;
+            (item as any).label = enhancedLabel;
+
+            // Enhanced tooltip with comprehensive metadata
+            let tooltip = `📁 ${file.fsPath}`;
+
             if (dir.comment)
             {
-                tooltip += `\n💬 ${dir.comment}`;
+                tooltip += `\n💬 Comment: ${dir.comment}`;
             }
+
             if (dir.tags && dir.tags.length > 0)
             {
                 tooltip += `\n🏷️ Tags: ${dir.tags.join(', ')}`;
             }
+
+            tooltip += `\n📊 Priority: ${dir.priority} | Status: ${dir.status}`;
+
             if (dir.addedBy)
             {
                 tooltip += `\n👤 Added by: ${dir.addedBy}`;
             }
+
             if (dir.dateAdded)
             {
                 tooltip += `\n📅 Added: ${dir.dateAdded.toLocaleDateString()}`;
             }
+
+            if (dir.lastAccessed)
+            {
+                tooltip += `\n🕒 Last accessed: ${dir.lastAccessed.toLocaleDateString()}`;
+            }
+
+            if (dir.accessCount > 0)
+            {
+                tooltip += `\n📈 Access count: ${dir.accessCount}`;
+            }
+
             if (dir.aiSummary)
             {
-                tooltip += `\n🤖 AI Summary available`;
+                tooltip += `\n🤖 AI Summary: ${dir.aiSummary.substring(0, 100)}...`;
+            }
+
+            if (dir.watchers.length > 0)
+            {
+                tooltip += `\n👁️ Watchers: ${dir.watchers.join(', ')}`;
+            }
+
+            if (dir.relatedPRs.length > 0)
+            {
+                const prTitles = dir.relatedPRs.map(pr => `#${pr.id}: ${pr.title}`).join(', ');
+                tooltip += `\n🔗 Related PRs: ${prTitles}`;
+            }
+
+            if (dir.gitInfo)
+            {
+                tooltip += `\n🌿 Git: ${dir.gitInfo.currentBranch || 'unknown'}`;
+                if (dir.gitInfo.hasLocalChanges) tooltip += ' (modified)';
+                if (dir.gitInfo.conflictStatus === 'conflicts') tooltip += ' ⚠️ Conflicts';
+            }
+
+            const recentActivity = dir.getRecentActivity(5);
+            if (recentActivity.length > 0)
+            {
+                tooltip += `\n📝 Recent activity:`;
+                recentActivity.slice(0, 3).forEach(activity =>
+                {
+                    tooltip += `\n  • ${activity.description} (${activity.author})`;
+                });
             }
 
             item.tooltip = tooltip;
             item.setContextValue(this.bookmarkedDirectoryContextValue);
+
+            // Set description for additional info in tree view
+            let description = '';
+            if (dir.comments.length > 0) description += `💬${dir.comments.length} `;
+            if (dir.watchers.length > 0) description += `👁️${dir.watchers.length} `;
+            if (dir.priority !== 'medium') description += `📊${dir.priority} `;
+
+            if (description) item.description = description.trim();
+
             return item;
         });
     }
@@ -1353,5 +1817,465 @@ Keep the summary focused and easy to understand.`;
         {
             return null;
         }
+    }
+
+    private async handleGitDiffOption(uri: vscode.Uri, gitService: GitService, option: string, currentBranch: string): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot) return;
+
+        // Pass the absolute path and let GitService handle the path logic
+        const absolutePath = uri.fsPath;
+
+        // Debug: Log path information
+        console.log('Git diff requested for:', {
+            fileName: path.basename(absolutePath),
+            workspaceRoot: path.basename(workspaceRoot),
+            isWithinWorkspace: !path.relative(workspaceRoot, absolutePath).startsWith('..')
+        });
+
+        try
+        {
+            switch (option)
+            {
+                case 'working':
+                    await this.showWorkingDirectoryDiff(gitService, absolutePath);
+                    break;
+                case 'remote':
+                    await this.showRemoteDiff(gitService, absolutePath, currentBranch);
+                    break;
+                case 'branches':
+                    await this.showBranchDiff(gitService, absolutePath);
+                    break;
+                case 'history':
+                    await this.showFileHistory(gitService, absolutePath);
+                    break;
+            }
+        } catch (error)
+        {
+            console.error('Error handling git diff option:', error);
+            vscode.window.showErrorMessage(`Failed to show git diff: ${error}`);
+        }
+    }
+
+    private async showWorkingDirectoryDiff(gitService: GitService, absolutePath: string): Promise<void>
+    {
+        const diff = await gitService.getWorkingDirectoryChanges(absolutePath);
+
+        // Check if there was an error getting the diff
+        if (diff && diff.startsWith('Error:'))
+        {
+            vscode.window.showErrorMessage(diff);
+            return;
+        }
+
+        if (!diff || diff.trim() === '')
+        {
+            vscode.window.showInformationMessage('No uncommitted changes found for this file.');
+            return;
+        }
+
+        await this.presentDiffOptions(diff, path.basename(absolutePath), 'Working Directory vs HEAD', absolutePath);
+    }
+
+    private async showRemoteDiff(gitService: GitService, absolutePath: string, currentBranch: string): Promise<void>
+    {
+        const remoteBranch = `origin/${currentBranch}`;
+        const diff = await gitService.compareWithRemote(currentBranch, remoteBranch, absolutePath);
+
+        if (!diff || diff.trim() === '')
+        {
+            vscode.window.showInformationMessage('No differences found between local and remote for this file.');
+            return;
+        }
+
+        await this.presentDiffOptions(diff, path.basename(absolutePath), `Local vs ${remoteBranch}`, absolutePath);
+    }
+
+    private async showBranchDiff(gitService: GitService, absolutePath: string): Promise<void>
+    {
+        const branches = await gitService.getAllBranches();
+        const branchNames = branches.map(b => b.name).filter(name => !name.startsWith('remotes/'));
+
+        if (branchNames.length < 2)
+        {
+            vscode.window.showInformationMessage('Need at least 2 branches to compare.');
+            return;
+        }
+
+        const branch1 = await vscode.window.showQuickPick(branchNames, {
+            placeHolder: 'Select first branch'
+        });
+
+        if (!branch1) return;
+
+        const branch2 = await vscode.window.showQuickPick(
+            branchNames.filter(name => name !== branch1),
+            { placeHolder: 'Select second branch' }
+        );
+
+        if (!branch2) return;
+
+        // Use the GitService method for consistent path handling
+        const diff = await gitService.compareBranches(branch1, branch2, absolutePath);
+
+        if (!diff || diff.trim() === '')
+        {
+            vscode.window.showInformationMessage(`No differences found between ${branch1} and ${branch2} for this file.`);
+            return;
+        }
+
+        await this.presentDiffOptions(diff, path.basename(absolutePath), `${branch1} vs ${branch2}`, absolutePath);
+    }
+
+    private async showFileHistory(gitService: GitService, absolutePath: string): Promise<void>
+    {
+        const history = await gitService.getFileHistory(absolutePath, 10);
+
+        if (history.commits.length === 0)
+        {
+            vscode.window.showInformationMessage('No commit history found for this file.');
+            return;
+        }
+
+        const commitItems = history.commits.map(commit => ({
+            label: commit.message.split('\n')[0], // First line of commit message
+            description: `${commit.author} • ${commit.date.toLocaleDateString()}`,
+            detail: commit.hash.substring(0, 8),
+            commit
+        }));
+
+        const selectedCommit = await vscode.window.showQuickPick(commitItems, {
+            placeHolder: 'Select a commit to compare with current version'
+        });
+
+        if (!selectedCommit) return;
+
+        // Use GitService for consistent path handling
+        const diff = await gitService.getFileChanges(absolutePath, selectedCommit.commit.hash, 'HEAD');
+
+        if (!diff || diff.trim() === '')
+        {
+            vscode.window.showInformationMessage('No differences found with the selected commit.');
+            return;
+        }
+
+        await this.presentDiffOptions(diff, path.basename(absolutePath), `Current vs ${selectedCommit.commit.hash.substring(0, 8)}`, absolutePath);
+    }
+
+    private async presentDiffOptions(diff: string, fileName: string, compareInfo: string, absolutePath?: string): Promise<void>
+    {
+        const action = await vscode.window.showInformationMessage(
+            `Git diff found: ${compareInfo}`,
+            'View Diff', 'AI Summarize Diff', 'Open Side-by-Side', 'Cancel'
+        );
+
+        switch (action)
+        {
+            case 'View Diff':
+                await this.showDiffInEditor(diff, fileName, compareInfo);
+                break;
+            case 'AI Summarize Diff':
+                await this.generateAIDiffSummary(diff, fileName, compareInfo);
+                break;
+            case 'Open Side-by-Side':
+                if (absolutePath)
+                {
+                    await this.showSideBySideDiff(absolutePath, compareInfo);
+                } else
+                {
+                    vscode.window.showErrorMessage('Cannot open side-by-side diff: file path not available');
+                }
+                break;
+        }
+    }
+
+    private async showSideBySideDiff(absolutePath: string, compareInfo: string): Promise<void>
+    {
+        // Use VS Code's built-in diff viewer
+        const fileUri = vscode.Uri.file(absolutePath);
+
+        // For side-by-side diff, we'll use VS Code's built-in git diff
+        try
+        {
+            await vscode.commands.executeCommand('git.openChange', fileUri);
+        } catch (error)
+        {
+            vscode.window.showErrorMessage('Could not open side-by-side diff. Please ensure the Git extension is active.');
+        }
+    }
+
+    private async handleCherryPickOption(uri: vscode.Uri, gitService: GitService, sourceBranch: string, option: string): Promise<void>
+    {
+        const absolutePath = uri.fsPath;
+
+        try
+        {
+            switch (option)
+            {
+                case 'file':
+                    await this.showFileCommitsForCherryPick(gitService, sourceBranch, absolutePath);
+                    break;
+                case 'commits':
+                    await this.showBranchCommitsForCherryPick(gitService, sourceBranch);
+                    break;
+            }
+        } catch (error)
+        {
+            console.error('Error handling cherry-pick option:', error);
+            vscode.window.showErrorMessage(`Failed to handle cherry-pick: ${error}`);
+        }
+    }
+
+    private async showFileCommitsForCherryPick(gitService: GitService, sourceBranch: string, absolutePath: string): Promise<void>
+    {
+        // Get commits that affected this specific file from the source branch
+        const commits = await gitService.getCommitsFromBranch(sourceBranch, absolutePath, 20);
+
+        if (commits.length === 0)
+        {
+            vscode.window.showInformationMessage(`No commits found for this file in branch '${sourceBranch}'.`);
+            return;
+        }
+
+        // Create commit selection items
+        const commitItems = commits.map(commit => ({
+            label: `${commit.hash.substring(0, 8)} - ${commit.message.split('\n')[0]}`,
+            description: `${commit.author} • ${commit.date.toLocaleDateString()}`,
+            detail: commit.message.length > 50 ? commit.message.substring(0, 50) + '...' : commit.message,
+            commit
+        }));
+
+        // Allow multi-select for commits
+        const selectedCommits = await vscode.window.showQuickPick(commitItems, {
+            placeHolder: `Select commits to cherry-pick for ${path.basename(absolutePath)}`,
+            canPickMany: true
+        });
+
+        if (!selectedCommits || selectedCommits.length === 0) return;
+
+        // Show confirmation dialog
+        const commitMessages = selectedCommits.map(item =>
+            `• ${item.commit.hash.substring(0, 8)}: ${item.commit.message.split('\n')[0]}`
+        ).join('\n');
+
+        const confirmation = await vscode.window.showWarningMessage(
+            `Cherry-pick ${selectedCommits.length} commit(s) for file '${path.basename(absolutePath)}'?\n\n${commitMessages}`,
+            'Yes, Cherry-pick', 'Cancel'
+        );
+
+        if (confirmation !== 'Yes, Cherry-pick') return;
+
+        // Apply cherry-picks
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Cherry-picking file changes...",
+            cancellable: false
+        }, async (progress) =>
+        {
+            const results: string[] = [];
+
+            for (let i = 0; i < selectedCommits.length; i++)
+            {
+                const commit = selectedCommits[i].commit;
+                progress.report({
+                    increment: (100 / selectedCommits.length),
+                    message: `Processing commit ${i + 1}/${selectedCommits.length}: ${commit.hash.substring(0, 8)}`
+                });
+
+                const result = await gitService.cherryPickCommit(commit.hash, absolutePath);
+                results.push(result.success ? `✓ ${result.message}` : `✗ ${result.message}`);
+            }
+
+            // Show results
+            const successCount = results.filter(r => r.startsWith('✓')).length;
+            const failureCount = results.filter(r => r.startsWith('✗')).length;
+
+            const resultMessage = `Cherry-pick completed!\n\n✅ Success: ${successCount}\n❌ Failed: ${failureCount}\n\nDetails:\n${results.join('\n')}`;
+
+            if (failureCount === 0)
+            {
+                vscode.window.showInformationMessage('All cherry-picks completed successfully!')
+                    .then(() => this.showDetailedResults(resultMessage));
+            }
+            else
+            {
+                vscode.window.showWarningMessage(`Cherry-pick completed with ${failureCount} failures`)
+                    .then(() => this.showDetailedResults(resultMessage));
+            }
+        });
+    }
+
+    private async showBranchCommitsForCherryPick(gitService: GitService, sourceBranch: string): Promise<void>
+    {
+        // Get recent commits from the source branch
+        const commits = await gitService.getCommitsFromBranch(sourceBranch, undefined, 20);
+
+        if (commits.length === 0)
+        {
+            vscode.window.showInformationMessage(`No commits found in branch '${sourceBranch}'.`);
+            return;
+        }
+
+        // Create commit selection items
+        const commitItems = commits.map(commit => ({
+            label: `${commit.hash.substring(0, 8)} - ${commit.message.split('\n')[0]}`,
+            description: `${commit.author} • ${commit.date.toLocaleDateString()}`,
+            detail: `Files: ${commit.files.length > 0 ? commit.files.join(', ') : 'N/A'}`,
+            commit
+        }));
+
+        // Allow selection of commit range or individual commits
+        const cherryPickType = await vscode.window.showQuickPick([
+            {
+                label: 'Select Individual Commits',
+                description: 'Choose specific commits to cherry-pick',
+                option: 'individual'
+            },
+            {
+                label: 'Select Commit Range',
+                description: 'Cherry-pick a range of commits',
+                option: 'range'
+            }
+        ], {
+            placeHolder: 'Choose cherry-pick method'
+        });
+
+        if (!cherryPickType) return;
+
+        if (cherryPickType.option === 'individual')
+        {
+            await this.handleIndividualCommitCherryPick(gitService, commitItems);
+        }
+        else
+        {
+            await this.handleRangeCommitCherryPick(gitService, commitItems);
+        }
+    }
+
+    private async handleIndividualCommitCherryPick(gitService: GitService, commitItems: any[]): Promise<void>
+    {
+        const selectedCommits = await vscode.window.showQuickPick(commitItems, {
+            placeHolder: 'Select commits to cherry-pick',
+            canPickMany: true
+        });
+
+        if (!selectedCommits || selectedCommits.length === 0) return;
+
+        // Show confirmation
+        const commitMessages = selectedCommits.map(item =>
+            `• ${item.commit.hash.substring(0, 8)}: ${item.commit.message.split('\n')[0]}`
+        ).join('\n');
+
+        const confirmation = await vscode.window.showWarningMessage(
+            `Cherry-pick ${selectedCommits.length} commit(s)?\n\n${commitMessages}`,
+            'Yes, Cherry-pick', 'Cancel'
+        );
+
+        if (confirmation !== 'Yes, Cherry-pick') return;
+
+        // Apply cherry-picks
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Cherry-picking commits...",
+            cancellable: false
+        }, async (progress) =>
+        {
+            const results: string[] = [];
+
+            for (let i = 0; i < selectedCommits.length; i++)
+            {
+                const commit = selectedCommits[i].commit;
+                progress.report({
+                    increment: (100 / selectedCommits.length),
+                    message: `Processing commit ${i + 1}/${selectedCommits.length}: ${commit.hash.substring(0, 8)}`
+                });
+
+                const result = await gitService.cherryPickCommit(commit.hash);
+                results.push(result.success ? `✓ ${result.message}` : `✗ ${result.message}`);
+
+                // If there's a failure, stop and let user handle it
+                if (!result.success && result.message.includes('conflict'))
+                {
+                    const action = await vscode.window.showErrorMessage(
+                        `Cherry-pick conflict detected on commit ${commit.hash.substring(0, 8)}. What would you like to do?`,
+                        'Abort Cherry-pick', 'Continue Manually', 'Skip This Commit'
+                    );
+
+                    if (action === 'Abort Cherry-pick')
+                    {
+                        await gitService.abortCherryPick();
+                        results.push('✗ Cherry-pick aborted by user');
+                        break;
+                    }
+                    else if (action === 'Continue Manually')
+                    {
+                        vscode.window.showInformationMessage('Please resolve conflicts manually, then run "git cherry-pick --continue"');
+                        break;
+                    }
+                    // Skip and continue with next commit
+                }
+            }
+
+            this.showDetailedResults(`Cherry-pick Results:\n\n${results.join('\n')}`);
+        });
+    }
+
+    private async handleRangeCommitCherryPick(gitService: GitService, commitItems: any[]): Promise<void>
+    {
+        const fromCommit = await vscode.window.showQuickPick(commitItems, {
+            placeHolder: 'Select starting commit (older)'
+        });
+
+        if (!fromCommit) return;
+
+        const toCommits = commitItems.filter(item => item.commit.hash !== fromCommit.commit.hash);
+        const toCommit = await vscode.window.showQuickPick(toCommits, {
+            placeHolder: 'Select ending commit (newer)'
+        });
+
+        if (!toCommit) return;
+
+        const confirmation = await vscode.window.showWarningMessage(
+            `Cherry-pick commit range ${fromCommit.commit.hash.substring(0, 8)}..${toCommit.commit.hash.substring(0, 8)}?`,
+            'Yes, Cherry-pick Range', 'Cancel'
+        );
+
+        if (confirmation !== 'Yes, Cherry-pick Range') return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Cherry-picking commit range...",
+            cancellable: false
+        }, async () =>
+        {
+            const result = await gitService.cherryPickRange(fromCommit.commit.hash, toCommit.commit.hash);
+
+            if (result.success)
+            {
+                vscode.window.showInformationMessage(result.message);
+            }
+            else
+            {
+                vscode.window.showErrorMessage(result.message);
+            }
+        });
+    }
+
+    private async showDetailedResults(message: string): Promise<void>
+    {
+        // Create and show results in a new document
+        const doc = await vscode.workspace.openTextDocument({
+            content: message,
+            language: 'plaintext'
+        });
+
+        await vscode.window.showTextDocument(doc, {
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: false
+        });
     }
 }

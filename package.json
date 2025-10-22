@@ -23,7 +23,17 @@
     "focus",
     "manager",
     "finder",
-    "drawer"
+    "drawer",
+    "git",
+    "github",
+    "collaboration",
+    "team",
+    "ai",
+    "copilot",
+    "diff",
+    "workspace",
+    "navigation",
+    "productivity"
   ],
   "activationEvents": [
     "onCommand:explorer-bookmark.selectItem"
@@ -99,8 +109,28 @@
       },
       {
         "command": "directoryprovider/showgitdiff",
-        "title": "Git Diff vs Remote",
+        "title": "Diff tool",
         "icon": "$(git-compare)"
+      },
+      {
+        "command": "directoryprovider/cherrypickchanges",
+        "title": "Cherry-pick Changes",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "directoryprovider/gitaddfile",
+        "title": "Git: Stage File",
+        "icon": "$(add)"
+      },
+      {
+        "command": "directoryprovider/gitcommitfile",
+        "title": "Git: Commit File",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "directoryprovider/gitstashfile",
+        "title": "Git: Stash File",
+        "icon": "$(archive)"
       },
       {
         "command": "directoryprovider/exportteambookmarks",
@@ -131,11 +161,6 @@
         "command": "directoryprovider/addcomment",
         "title": "Add Comment",
         "icon": "$(comment)"
-      },
-      {
-        "command": "directoryprovider/managewatchers",
-        "title": "Manage Watchers",
-        "icon": "$(eye)"
       },
       {
         "command": "directoryprovider/updatestatus",
@@ -255,17 +280,32 @@
           "group": "git"
         },
         {
+          "command": "directoryprovider/cherrypickchanges",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/gitaddfile",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/gitcommitfile",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/gitstashfile",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "group": "git"
+        },
+        {
           "command": "directoryprovider/opencollab",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "collaboration"
         },
         {
           "command": "directoryprovider/addcomment",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
-          "group": "collaboration"
-        },
-        {
-          "command": "directoryprovider/managewatchers",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "collaboration"
         },
@@ -310,11 +350,6 @@
           "group": "collaboration"
         },
         {
-          "command": "directoryprovider/managewatchers",
-          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
-          "group": "collaboration"
-        },
-        {
           "command": "directoryprovider/updatestatus",
           "when": "view == explorer-bookmark && viewItem != bookmarkSection",
           "group": "collaboration"
@@ -331,6 +366,26 @@
         },
         {
           "command": "directoryprovider/showgitdiff",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/cherrypickchanges",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/gitaddfile",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/gitcommitfile",
+          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
+          "group": "git"
+        },
+        {
+          "command": "directoryprovider/gitstashfile",
           "when": "view == explorer-bookmark && viewItem != bookmarkSection",
           "group": "git"
         },
@@ -386,11 +441,6 @@
           "type": "string",
           "default": "",
           "description": "GitHub Personal Access Token for PR integration and repository operations"
-        },
-        "folderHub.enableCollaborativeFeatures": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable collaborative features like comments, watchers, and activity tracking"
         },
         "folderHub.autoRefreshGitInfo": {
           "type": "boolean",

@@ -8,6 +8,26 @@ import { GitHubService } from "./services/GitHubService";
 
 export function activate(context: vscode.ExtensionContext)
 {
+  // Show welcome message for new users
+  const hasShownWelcome = context.globalState.get('hasShownWelcome', false);
+  if (!hasShownWelcome)
+  {
+    vscode.window.showInformationMessage(
+      'Welcome to Explorer Bookmark! Right-click any file or folder to create your first bookmark.',
+      'Show Documentation', 'Create First Bookmark'
+    ).then(selection =>
+    {
+      if (selection === 'Show Documentation')
+      {
+        vscode.env.openExternal(vscode.Uri.parse('https://github.com/UrosVuj/Explorer-Bookmark#readme'));
+      } else if (selection === 'Create First Bookmark')
+      {
+        vscode.commands.executeCommand('workbench.view.explorer');
+      }
+    });
+    context.globalState.update('hasShownWelcome', true);
+  }
+
   const directoryOperator = new DirectoryWorker(
     context,
     vscode.workspace.workspaceFolders
@@ -111,6 +131,22 @@ export function activate(context: vscode.ExtensionContext)
         (args) => directoryProvider.showGitDiff(args.resourceUri)
       ),
       vscode.commands.registerCommand(
+        DirectoryProviderCommands.CherryPickChanges,
+        (args) => directoryProvider.cherryPickChanges(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitAddFile,
+        (args) => directoryProvider.gitAddFile(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitCommitFile,
+        (args) => directoryProvider.gitCommitFile(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitStashFile,
+        (args) => directoryProvider.gitStashFile(args.resourceUri)
+      ),
+      vscode.commands.registerCommand(
         DirectoryProviderCommands.ExportTeamBookmarks,
         () => directoryProvider.exportTeamBookmarks()
       ),
@@ -139,10 +175,6 @@ export function activate(context: vscode.ExtensionContext)
       vscode.commands.registerCommand(
         DirectoryProviderCommands.AddComment,
         (args) => directoryProvider.addQuickComment(args.resourceUri)
-      ),
-      vscode.commands.registerCommand(
-        DirectoryProviderCommands.ManageWatchers,
-        (args) => directoryProvider.manageWatchers(args.resourceUri)
       ),
       vscode.commands.registerCommand(
         DirectoryProviderCommands.UpdateStatus,
