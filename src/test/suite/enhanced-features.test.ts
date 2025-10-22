@@ -38,11 +38,6 @@ suite('Explorer Bookmark Enhanced Features Test Suite', () =>
         assert.strictEqual(testDir.status, 'in-review');
         assert.strictEqual(testDir.priority, 'high');
 
-        // Test activity tracking
-        assert.ok(testDir.activityHistory.length > 0);
-        const recentActivity = testDir.getRecentActivity(10);
-        assert.ok(recentActivity.length > 0);
-
         // Test AI summary
         testDir.updateAISummary('This is a test file for TypeScript functionality');
         assert.ok(testDir.aiSummary);
@@ -144,7 +139,6 @@ suite('Explorer Bookmark Enhanced Features Test Suite', () =>
         assert.ok('watchers' in testDir, 'Watchers system should be available');
         assert.ok('priority' in testDir, 'Priority system should be available');
         assert.ok('status' in testDir, 'Status system should be available');
-        assert.ok('activityHistory' in testDir, 'Activity tracking should be available');
 
         // Git integration features
         assert.ok('gitInfo' in testDir, 'Git integration should be available');

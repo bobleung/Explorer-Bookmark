@@ -153,11 +153,6 @@
         "icon": "$(file-code)"
       },
       {
-        "command": "directoryprovider/opencollab",
-        "title": "Open Collaboration Panel",
-        "icon": "$(organization)"
-      },
-      {
         "command": "directoryprovider/addcomment",
         "title": "Add Comment",
         "icon": "$(comment)"
@@ -171,11 +166,6 @@
         "command": "directoryprovider/updatepriority",
         "title": "Update Priority",
         "icon": "$(flame)"
-      },
-      {
-        "command": "directoryprovider/showactivity",
-        "title": "Show Activity History",
-        "icon": "$(history)"
       },
       {
         "command": "directoryprovider/createpr",
@@ -300,11 +290,6 @@
           "group": "git"
         },
         {
-          "command": "directoryprovider/opencollab",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
-          "group": "collaboration"
-        },
-        {
           "command": "directoryprovider/addcomment",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "collaboration"
@@ -316,11 +301,6 @@
         },
         {
           "command": "directoryprovider/updatepriority",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
-          "group": "collaboration"
-        },
-        {
-          "command": "directoryprovider/showactivity",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "collaboration"
         },
@@ -340,11 +320,6 @@
           "group": "github"
         },
         {
-          "command": "directoryprovider/opencollab",
-          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
-          "group": "collaboration"
-        },
-        {
           "command": "directoryprovider/addcomment",
           "when": "view == explorer-bookmark && viewItem != bookmarkSection",
           "group": "collaboration"
@@ -356,11 +331,6 @@
         },
         {
           "command": "directoryprovider/updatepriority",
-          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
-          "group": "collaboration"
-        },
-        {
-          "command": "directoryprovider/showactivity",
           "when": "view == explorer-bookmark && viewItem != bookmarkSection",
           "group": "collaboration"
         },
@@ -446,11 +416,6 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically refresh git information when bookmarks are accessed"
-        },
-        "folderHub.maxActivityHistory": {
-          "type": "number",
-          "default": 100,
-          "description": "Maximum number of activity entries to keep per bookmark"
         },
         "folderHub.notificationLevel": {
           "type": "string",

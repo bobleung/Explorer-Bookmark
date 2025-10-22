@@ -37,19 +37,6 @@ export interface PullRequestInfo
   sourceBranch?: string;
 }
 
-export interface ActivityEntry
-{
-  id: string;
-  type: 'comment' | 'tag-added' | 'tag-removed' | 'git-change' | 'pr-update' | 'status-change' |
-  'priority-change' | 'watcher-added' | 'watcher-removed' | 'comment-resolved' |
-  'ai-summary-update' | 'git-branch-change' | 'git-changes' | 'pr-linked' |
-  'bulk-resolve' | 'bulk-delete';
-  author: string;
-  timestamp: Date;
-  description: string;
-  details?: any;
-}
-
 export class TypedDirectory
 {
   path: string;
@@ -71,8 +58,7 @@ export class TypedDirectory
   gitInfo?: GitInfo;
   relatedPRs: PullRequestInfo[];
 
-  // Activity & Analytics
-  activityHistory: ActivityEntry[];
+  // Analytics
   lastAccessed?: Date;
   accessCount: number;
 
@@ -93,8 +79,7 @@ export class TypedDirectory
     // Git Integration
     gitInfo?: GitInfo,
     relatedPRs?: PullRequestInfo[],
-    // Activity & Analytics
-    activityHistory?: ActivityEntry[],
+    // Analytics
     lastAccessed?: Date,
     accessCount?: number
   )
@@ -118,8 +103,7 @@ export class TypedDirectory
     this.gitInfo = gitInfo;
     this.relatedPRs = relatedPRs || [];
 
-    // Initialize activity & analytics
-    this.activityHistory = activityHistory || [];
+    // Initialize analytics
     this.lastAccessed = lastAccessed;
     this.accessCount = accessCount || 0;
   }
@@ -128,7 +112,6 @@ export class TypedDirectory
   {
     this.aiSummary = summary;
     this.lastSummaryUpdate = new Date();
-    this.addActivity('ai-summary-update', 'AI', 'AI summary updated');
   }
 
   addTag(tag: string): void
@@ -137,7 +120,6 @@ export class TypedDirectory
     if (!this.tags.includes(tag))
     {
       this.tags.push(tag);
-      this.addActivity('tag-added', this.addedBy || 'unknown', `Added tag: ${tag}`);
     }
   }
 
@@ -146,7 +128,6 @@ export class TypedDirectory
     if (this.tags)
     {
       this.tags = this.tags.filter(t => t !== tag);
-      this.addActivity('tag-removed', this.addedBy || 'unknown', `Removed tag: ${tag}`);
     }
   }
 
@@ -165,7 +146,6 @@ export class TypedDirectory
     };
 
     this.comments.push(comment);
-    this.addActivity('comment', author, `Added ${type} comment`);
     return comment;
   }
 
@@ -175,7 +155,6 @@ export class TypedDirectory
     if (comment)
     {
       comment.resolved = true;
-      this.addActivity('comment-resolved', comment.author, 'Resolved comment');
     }
   }
 
@@ -199,14 +178,12 @@ export class TypedDirectory
     if (!this.watchers.includes(userId))
     {
       this.watchers.push(userId);
-      this.addActivity('watcher-added', userId, 'Started watching');
     }
   }
 
   removeWatcher(userId: string): void
   {
     this.watchers = this.watchers.filter(w => w !== userId);
-    this.addActivity('watcher-removed', userId, 'Stopped watching');
   }
 
   // Status Management
@@ -214,14 +191,12 @@ export class TypedDirectory
   {
     const oldStatus = this.status;
     this.status = newStatus;
-    this.addActivity('status-change', updatedBy, `Status changed from ${oldStatus} to ${newStatus}`);
   }
 
   updatePriority(newPriority: TypedDirectory['priority'], updatedBy: string): void
   {
     const oldPriority = this.priority;
     this.priority = newPriority;
-    this.addActivity('priority-change', updatedBy, `Priority changed from ${oldPriority} to ${newPriority}`);
   }
 
   // Git Integration
@@ -229,16 +204,6 @@ export class TypedDirectory
   {
     const oldInfo = this.gitInfo;
     this.gitInfo = gitInfo;
-
-    if (oldInfo?.currentBranch !== gitInfo.currentBranch)
-    {
-      this.addActivity('git-branch-change', 'git', `Branch changed to ${gitInfo.currentBranch}`);
-    }
-
-    if (gitInfo.hasLocalChanges && !oldInfo?.hasLocalChanges)
-    {
-      this.addActivity('git-changes', 'git', 'Local changes detected');
-    }
   }
 
   addRelatedPR(prInfo: PullRequestInfo): void
@@ -247,7 +212,6 @@ export class TypedDirectory
     if (!exists)
     {
       this.relatedPRs.push(prInfo);
-      this.addActivity('pr-linked', prInfo.author, `Linked PR #${prInfo.id}: ${prInfo.title}`);
     }
   }
 
@@ -258,28 +222,6 @@ export class TypedDirectory
     {
       pr.status = newStatus;
       pr.updated = new Date();
-      this.addActivity('pr-update', pr.author, `PR #${prId} status: ${newStatus}`);
-    }
-  }
-
-  // Activity Tracking
-  addActivity(type: ActivityEntry['type'], author: string, description: string, details?: any): void
-  {
-    const activity: ActivityEntry = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      type,
-      author,
-      timestamp: new Date(),
-      description,
-      details
-    };
-
-    this.activityHistory.unshift(activity); // Add to beginning for latest-first order
-
-    // Keep only last 100 activities to prevent bloat
-    if (this.activityHistory.length > 100)
-    {
-      this.activityHistory = this.activityHistory.slice(0, 100);
     }
   }
 
@@ -310,13 +252,6 @@ export class TypedDirectory
   getCommentsByType(type: Comment['type']): Comment[]
   {
     return this.comments.filter(c => c.type === type);
-  }
-
-  getRecentActivity(days: number = 7): ActivityEntry[]
-  {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    return this.activityHistory.filter(a => a.timestamp > cutoff);
   }
 
   isWatchedBy(userId: string): boolean

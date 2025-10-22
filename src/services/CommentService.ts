@@ -407,11 +407,6 @@ export class CommentService
             }
         });
 
-        if (resolvedCount > 0)
-        {
-            item.addActivity('bulk-resolve', author || 'system', `Resolved ${resolvedCount} comments`);
-        }
-
         return resolvedCount;
     }
 
@@ -420,11 +415,6 @@ export class CommentService
         const initialCount = item.comments.length;
         item.comments = item.comments.filter(c => c.author !== author);
         const deletedCount = initialCount - item.comments.length;
-
-        if (deletedCount > 0)
-        {
-            item.addActivity('bulk-delete', 'system', `Deleted ${deletedCount} comments by ${author}`);
-        }
 
         return deletedCount;
     }

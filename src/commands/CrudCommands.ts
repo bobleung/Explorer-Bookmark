@@ -23,11 +23,9 @@ export enum DirectoryProviderCommands
     AddBookmarkComment = 'directoryprovider/addbookmarkcomment',
     AddBookmarkTags = 'directoryprovider/addbookmarktags',
     // New Collaborative Commands
-    OpenCollaboration = 'directoryprovider/opencollab',
     AddComment = 'directoryprovider/addcomment',
     UpdateStatus = 'directoryprovider/updatestatus',
     UpdatePriority = 'directoryprovider/updatepriority',
-    ShowActivity = 'directoryprovider/showactivity',
     CreatePR = 'directoryprovider/createpr',
     LinkPR = 'directoryprovider/linkpr',
     ShowGitHub = 'directoryprovider/showgithub',

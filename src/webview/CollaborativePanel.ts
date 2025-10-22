@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { TypedDirectory, Comment, ActivityEntry } from '../types/TypedDirectory';
+import { TypedDirectory, Comment } from '../types/TypedDirectory';
 import { CommentService, CommentThread } from '../services/CommentService';
 import { GitService } from '../services/GitService';
 import { GitHubService } from '../services/GitHubService';
@@ -341,7 +341,6 @@ export class CollaborativePanel
         const item = this._currentItem;
         const threads = this._commentService.getCommentThreads(item);
         const stats = this._commentService.getCommentStats(item);
-        const recentActivity = item.getRecentActivity(7);
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -619,19 +618,6 @@ export class CollaborativePanel
                 </div>
             `).join('')}
         </div>
-    </div>
-
-    <div class="section">
-        <h3>📊 Recent Activity</h3>
-        ${recentActivity.slice(0, 10).map(activity => `
-            <div class="activity-item">
-                <div class="activity-icon"></div>
-                <div>
-                    <strong>${activity.author}</strong> ${activity.description}
-                    <br><small>${new Date(activity.timestamp).toLocaleString()}</small>
-                </div>
-            </div>
-        `).join('')}
     </div>
 
     <div class="section">

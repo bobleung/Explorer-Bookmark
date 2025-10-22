@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { FileSystemObject } from "../types/FileSystemObject";
 import { DirectoryWorker } from "../operator/DirectoryWorker";
-import { CollaborativePanel } from "../webview/CollaborativePanel";
 import { GitHubService } from "../services/GitHubService";
 import { GitService } from "../services/GitService";
 
@@ -142,20 +141,6 @@ export class DirectoryProvider
     this.refresh();
   }
 
-  // New Collaborative Methods
-  async openCollaborationPanel(uri: vscode.Uri)
-  {
-    const item = await this.directoryOperator.getTypedDirectoryForUri(uri);
-    if (item)
-    {
-      const context = vscode.extensions.getExtension('UrosVujosevic.explorer-manager')?.extensionUri;
-      if (context)
-      {
-        CollaborativePanel.createOrShow(context, item);
-      }
-    }
-  }
-
   async addQuickComment(uri: vscode.Uri)
   {
     const comment = await vscode.window.showInputBox({
@@ -216,29 +201,6 @@ export class DirectoryProvider
       this.refresh();
       vscode.window.showInformationMessage(`Priority updated to ${priority.label}`);
     }
-  }
-
-  async showActivityHistory(uri: vscode.Uri)
-  {
-    const item = await this.directoryOperator.getTypedDirectoryForUri(uri);
-    if (!item) return;
-
-    const recentActivity = item.getRecentActivity(30); // Last 30 days
-
-    if (recentActivity.length === 0)
-    {
-      vscode.window.showInformationMessage('No recent activity for this bookmark');
-      return;
-    }
-
-    const activityItems = recentActivity.map((activity: any) => ({
-      label: `${activity.type}: ${activity.description}`,
-      description: `by ${activity.author} on ${activity.timestamp.toLocaleDateString()}`
-    }));
-
-    await vscode.window.showQuickPick(activityItems, {
-      placeHolder: 'Recent Activity History'
-    });
   }
 
   async createPullRequest(uri: vscode.Uri)

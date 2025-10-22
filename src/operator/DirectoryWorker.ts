@@ -1281,6 +1281,28 @@ Keep the summary focused and easy to understand.`;
             let displayLabel = path.basename(dir.path);
             let visualIndicators = '';
 
+            // Helper function to convert text to italic Unicode characters
+            const toItalic = (text: string): string =>
+            {
+                const italicMap: { [key: string]: string } = {
+                    'a': '𝘢', 'b': '𝘣', 'c': '𝘤', 'd': '𝘥', 'e': '𝘦', 'f': '𝘧', 'g': '𝘨', 'h': '𝘩', 'i': '𝘪', 'j': '𝘫',
+                    'k': '𝘬', 'l': '𝘭', 'm': '𝘮', 'n': '𝘯', 'o': '𝘰', 'p': '𝘱', 'q': '𝘲', 'r': '𝘳', 's': '𝘴', 't': '𝘵',
+                    'u': '𝘶', 'v': '𝘷', 'w': '𝘸', 'x': '𝘹', 'y': '𝘺', 'z': '𝘻',
+                    'A': '𝘈', 'B': '𝘉', 'C': '𝘊', 'D': '𝘋', 'E': '𝘌', 'F': '𝘍', 'G': '𝘎', 'H': '𝘏', 'I': '𝘐', 'J': '𝘑',
+                    'K': '𝘒', 'L': '𝘓', 'M': '𝘔', 'N': '𝘕', 'O': '𝘖', 'P': '𝘗', 'Q': '𝘘', 'R': '𝘙', 'S': '𝘚', 'T': '𝘛',
+                    'U': '𝘜', 'V': '𝘝', 'W': '𝘞', 'X': '𝘟', 'Y': '𝘠', 'Z': '𝘡'
+                };
+                return text.split('').map(char => italicMap[char] || char).join('');
+            };
+
+            // Tags display (shown as italic badges before filename)
+            let tagDisplay = '';
+            if (dir.tags && dir.tags.length > 0)
+            {
+                // Display tags in italic Unicode characters with brackets
+                tagDisplay = dir.tags.map(tag => `[${toItalic(tag)}]`).join(' ') + ' ';
+            }
+
             // Priority indicators
             if (dir.priority === 'critical') visualIndicators += '🔥 ';
             else if (dir.priority === 'high') visualIndicators += '⚡ ';
@@ -1293,7 +1315,6 @@ Keep the summary focused and easy to understand.`;
 
             // Feature indicators
             if (dir.comments.length > 0) visualIndicators += `💬${dir.comments.length} `;
-            if (dir.tags && dir.tags.length > 0) visualIndicators += '🏷️ ';
             if (dir.aiSummary) visualIndicators += '🤖 ';
             if (dir.watchers.length > 0) visualIndicators += `👁️${dir.watchers.length} `;
             if (dir.relatedPRs.length > 0) visualIndicators += `🔗${dir.relatedPRs.length} `;
@@ -1303,7 +1324,8 @@ Keep the summary focused and easy to understand.`;
             if (dir.gitInfo?.conflictStatus === 'conflicts') visualIndicators += '⚠️ ';
 
             // Update the item label through the constructor property
-            const enhancedLabel = visualIndicators + displayLabel;
+            // Tags appear first, then visual indicators, then filename
+            const enhancedLabel = tagDisplay + visualIndicators + displayLabel;
             (item as any).label = enhancedLabel;
 
             // Enhanced tooltip with comprehensive metadata
@@ -1362,16 +1384,6 @@ Keep the summary focused and easy to understand.`;
                 tooltip += `\n🌿 Git: ${dir.gitInfo.currentBranch || 'unknown'}`;
                 if (dir.gitInfo.hasLocalChanges) tooltip += ' (modified)';
                 if (dir.gitInfo.conflictStatus === 'conflicts') tooltip += ' ⚠️ Conflicts';
-            }
-
-            const recentActivity = dir.getRecentActivity(5);
-            if (recentActivity.length > 0)
-            {
-                tooltip += `\n📝 Recent activity:`;
-                recentActivity.slice(0, 3).forEach(activity =>
-                {
-                    tooltip += `\n  • ${activity.description} (${activity.author})`;
-                });
             }
 
             item.tooltip = tooltip;

@@ -70,25 +70,13 @@ export class AIService
                 return this.formatCopilotResponse(copilotResponse, filename);
             } else
             {
-                // Alternative: Open interactive Copilot session
-                const useInteractive = await vscode.window.showInformationMessage(
-                    'GitHub Copilot API not directly accessible. Would you like to generate the summary interactively?',
-                    'Yes, Open Copilot Chat', 'Use Basic Analysis'
-                );
-
-                if (useInteractive === 'Yes, Open Copilot Chat')
-                {
-                    return await this.generateInteractiveSummary(content, filename, extension, prompt);
-                } else
-                {
-                    // Fallback to basic analysis
-                    return this.generateFallbackSummary(content, filename, extension);
-                }
+                // Open interactive Copilot session
+                return await this.generateInteractiveSummary(content, filename, extension, prompt);
             }
         } catch (error)
         {
             console.error('Error invoking GitHub Copilot:', error);
-            return this.generateFallbackSummary(content, filename, extension);
+            return "GitHub Copilot is required for AI summaries. Please ensure GitHub Copilot is installed, active, and you are signed in.";
         }
     }
 
@@ -104,97 +92,13 @@ export class AIService
                 return this.formatCopilotResponse(copilotResponse, 'Git Diff Analysis');
             } else
             {
-                // Alternative: Open interactive Copilot session for custom prompt
-                const useInteractive = await vscode.window.showInformationMessage(
-                    'GitHub Copilot API not directly accessible. Would you like to analyze this diff interactively?',
-                    'Yes, Open Copilot Chat', 'Use Basic Analysis'
-                );
-
-                if (useInteractive === 'Yes, Open Copilot Chat')
-                {
-                    return await this.generateInteractiveCustomSummary(prompt);
-                } else
-                {
-                    // Return the prompt for manual analysis
-                    return this.generateBasicDiffAnalysis(prompt);
-                }
+                return "GitHub Copilot is required for diff analysis. Please ensure GitHub Copilot is installed, active, and you are signed in.";
             }
         } catch (error)
         {
             console.error('Error invoking GitHub Copilot for custom prompt:', error);
-            return this.generateBasicDiffAnalysis(prompt);
+            return "GitHub Copilot is required for diff analysis. Please ensure GitHub Copilot is installed, active, and you are signed in.";
         }
-    }
-
-    private static async generateInteractiveCustomSummary(prompt: string): Promise<string>
-    {
-        try
-        {
-            // Create a temporary document with the custom prompt
-            const promptDoc = await vscode.workspace.openTextDocument({
-                content: prompt,
-                language: 'markdown'
-            });
-
-            // Show the document
-            await vscode.window.showTextDocument(promptDoc);
-
-            // Try to open Copilot Chat
-            try
-            {
-                await vscode.commands.executeCommand('github.copilot.interactiveEditor.explain');
-            } catch
-            {
-                try
-                {
-                    await vscode.commands.executeCommand('workbench.panel.chat.view.copilot.focus');
-                } catch
-                {
-                    vscode.window.showInformationMessage(
-                        'Please use the Copilot Chat panel to analyze the diff. The prompt has been opened in a new document.'
-                    );
-                }
-            }
-
-            return `# 🤖 Git Diff Analysis
-
-*To generate a comprehensive AI analysis:*
-
-1. **Copy the analysis prompt** from the document that was just opened
-2. **Open GitHub Copilot Chat** (Ctrl+Shift+P → "GitHub Copilot: Focus on Copilot Chat")
-3. **Paste and send** the prompt to get an intelligent analysis
-
----
-
-*The prompt has been prepared for you. Please follow the steps above to use GitHub Copilot Chat for detailed diff analysis.*`;
-
-        } catch (error)
-        {
-            console.error('Error creating interactive custom session:', error);
-            return this.generateBasicDiffAnalysis(prompt);
-        }
-    }
-
-    private static generateBasicDiffAnalysis(prompt: string): string
-    {
-        // Extract key information from the prompt
-        const lines = prompt.split('\n');
-        const diffLines = lines.filter(line => line.startsWith('+') || line.startsWith('-'));
-        const additions = diffLines.filter(line => line.startsWith('+')).length;
-        const deletions = diffLines.filter(line => line.startsWith('-')).length;
-
-        return `# Git Diff Analysis
-
-## Summary
-- **Additions**: ${additions} lines
-- **Deletions**: ${deletions} lines
-- **Net Change**: ${additions - deletions} lines
-
-## Change Overview
-This diff contains modifications to the file. For detailed AI analysis, please use GitHub Copilot Chat with the provided prompt.
-
-## Manual Review Recommended
-For complex changes, manual review and GitHub Copilot Chat analysis are recommended to understand the full impact of these modifications.`;
     }
 
     private static async generateInteractiveSummary(content: string, filename: string, extension: string, prompt: string): Promise<string>
@@ -237,18 +141,14 @@ For complex changes, manual review and GitHub Copilot Chat analysis are recommen
 3. **Paste and send** the prompt to get an intelligent analysis
 4. **Copy the response** back here if you want to save it with the bookmark
 
-## Quick Manual Analysis
-
-${this.generateFallbackSummary(content, filename, extension)}
-
 ---
 
-*For the best AI-powered analysis, please follow the steps above to use GitHub Copilot Chat.*`;
+*Please follow the steps above to use GitHub Copilot Chat for AI-powered analysis.*`;
 
         } catch (error)
         {
             console.error('Error creating interactive session:', error);
-            return this.generateFallbackSummary(content, filename, extension);
+            return "GitHub Copilot is required for AI summaries. Please ensure GitHub Copilot is installed, active, and you are signed in.";
         }
     }
 
@@ -404,131 +304,5 @@ Format the response in markdown with clear sections and bullet points.`;
         const footer = `\n\n---\n\n*Summary generated on ${new Date().toLocaleString()}*`;
 
         return header + response + footer;
-    }
-
-    private static generateFallbackSummary(content: string, filename: string, extension: string): string
-    {
-        const lines = content.split('\n');
-        const totalLines = lines.length;
-        const nonEmptyLines = lines.filter(line => line.trim().length > 0).length;
-        const fileSize = Buffer.byteLength(content, 'utf8');
-
-        let summary = `# 📄 File Summary: ${filename}\n\n`;
-        summary += `*GitHub Copilot unavailable - using basic analysis*\n\n`;
-        summary += `## Basic Information\n`;
-        summary += `- **File Type**: ${extension}\n`;
-        summary += `- **Total Lines**: ${totalLines}\n`;
-        summary += `- **Non-empty Lines**: ${nonEmptyLines}\n`;
-        summary += `- **File Size**: ${(fileSize / 1024).toFixed(2)} KB\n\n`;
-
-        // Simple pattern detection
-        summary += `## Quick Analysis\n`;
-
-        // Check for common patterns
-        const patterns = this.detectBasicPatterns(content, extension);
-        patterns.forEach(pattern =>
-        {
-            summary += `- ${pattern}\n`;
-        });
-
-        // Check for TODO/FIXME comments
-        const todos = content.match(/(?:TODO|FIXME|HACK|BUG):/gi) || [];
-        if (todos.length > 0)
-        {
-            summary += `- **Action Items**: ${todos.length} TODO/FIXME comments found\n`;
-        }
-
-        summary += `\n## Note\n`;
-        summary += `To get detailed AI-powered analysis, please ensure GitHub Copilot is installed and active.`;
-
-        return summary;
-    }
-
-    private static detectBasicPatterns(content: string, extension: string): string[]
-    {
-        const patterns: string[] = [];
-
-        // Language-specific basic detection
-        switch (extension)
-        {
-            case '.js':
-            case '.ts':
-            case '.jsx':
-            case '.tsx':
-                if (content.includes('import ') || content.includes('require('))
-                {
-                    patterns.push('**Module System**: Uses imports/requires');
-                }
-                if (content.includes('class '))
-                {
-                    patterns.push('**Object-Oriented**: Contains class definitions');
-                }
-                if (content.includes('function ') || content.includes('=>'))
-                {
-                    patterns.push('**Functional**: Contains function definitions');
-                }
-                if (content.includes('useState') || content.includes('useEffect'))
-                {
-                    patterns.push('**Framework**: React with Hooks detected');
-                }
-                if (content.includes('interface ') || content.includes('type '))
-                {
-                    patterns.push('**TypeScript**: Type definitions found');
-                }
-                break;
-
-            case '.py':
-                if (content.includes('def '))
-                {
-                    patterns.push('**Functions**: Python function definitions found');
-                }
-                if (content.includes('class '))
-                {
-                    patterns.push('**Classes**: Python class definitions found');
-                }
-                if (content.includes('import ') || content.includes('from '))
-                {
-                    patterns.push('**Modules**: Import statements found');
-                }
-                break;
-
-            case '.md':
-                const headers = content.match(/^#+/gm) || [];
-                if (headers.length > 0)
-                {
-                    patterns.push(`**Documentation**: ${headers.length} headers found`);
-                }
-                break;
-
-            case '.json':
-                try
-                {
-                    const parsed = JSON.parse(content);
-                    if (parsed.name && parsed.version)
-                    {
-                        patterns.push('**Package Configuration**: Appears to be package.json');
-                    }
-                } catch
-                {
-                    patterns.push('**JSON**: Invalid JSON format');
-                }
-                break;
-        }
-
-        // General patterns
-        if (content.includes('test') || content.includes('spec'))
-        {
-            patterns.push('**Testing**: Likely a test file');
-        }
-        if (content.includes('config') || content.includes('settings'))
-        {
-            patterns.push('**Configuration**: Configuration-related content');
-        }
-        if (content.includes('api') || content.includes('endpoint'))
-        {
-            patterns.push('**API**: API-related functionality');
-        }
-
-        return patterns.length > 0 ? patterns : ['**Content**: Standard file with no specific patterns detected'];
     }
 }
