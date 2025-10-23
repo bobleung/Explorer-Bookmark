@@ -1173,7 +1173,7 @@ export class GitService
             }
 
             // Git doesn't have a built-in "stash single file" command
-            // We'll use a workaround: stage everything else, then stash --keep-index
+            // Mora hak da se uradi: stage everything else, then stash --keep-index
 
             // Save current changes
             const currentChanges = await this.git.diff();
