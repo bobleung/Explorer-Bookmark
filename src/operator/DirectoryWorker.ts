@@ -398,8 +398,8 @@ export class DirectoryWorker
         }
 
         // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath) 
-            ? uri.fsPath 
+        const filePath = path.isAbsolute(uri.fsPath)
+            ? uri.fsPath
             : path.join(workspaceRoot, uri.fsPath);
 
         // Check if the file is within the workspace
@@ -483,8 +483,8 @@ export class DirectoryWorker
         }
 
         // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath) 
-            ? uri.fsPath 
+        const filePath = path.isAbsolute(uri.fsPath)
+            ? uri.fsPath
             : path.join(workspaceRoot, uri.fsPath);
 
         // Check if the file is within the workspace
@@ -576,8 +576,8 @@ export class DirectoryWorker
         }
 
         // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath) 
-            ? uri.fsPath 
+        const filePath = path.isAbsolute(uri.fsPath)
+            ? uri.fsPath
             : path.join(workspaceRoot, uri.fsPath);
 
         const relativePath = path.relative(workspaceRoot, filePath);
@@ -676,8 +676,8 @@ export class DirectoryWorker
         }
 
         // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath) 
-            ? uri.fsPath 
+        const filePath = path.isAbsolute(uri.fsPath)
+            ? uri.fsPath
             : path.join(workspaceRoot, uri.fsPath);
 
         const relativePath = path.relative(workspaceRoot, filePath);
@@ -767,8 +767,8 @@ export class DirectoryWorker
         }
 
         // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath) 
-            ? uri.fsPath 
+        const filePath = path.isAbsolute(uri.fsPath)
+            ? uri.fsPath
             : path.join(workspaceRoot, uri.fsPath);
 
         const relativePath = path.relative(workspaceRoot, filePath);
@@ -881,8 +881,8 @@ export class DirectoryWorker
                 for (const dir of section.directories)
                 {
                     // If the path is already absolute, use it; otherwise resolve it relative to workspace
-                    const absolutePath = path.isAbsolute(dir.path) 
-                        ? dir.path 
+                    const absolutePath = path.isAbsolute(dir.path)
+                        ? dir.path
                         : path.join(workspaceRoot, dir.path);
 
                     // Normalize paths for comparison
@@ -2454,37 +2454,38 @@ Keep the summary focused and easy to understand.`;
         {
             const relativePath = path.relative(workspaceRoot, absolutePath);
             const normalizedPath = relativePath.replace(/\\/g, '/');
-            
+
             // Determine which version to compare against
             let compareRef = 'HEAD';
             let compareLabel = 'HEAD';
-            
+
             if (diffType === 'remote' && remoteBranch)
             {
                 compareRef = remoteBranch;
                 compareLabel = remoteBranch;
             }
-            
+
             // Get comparison content using simple-git
             const git = simpleGit(workspaceRoot);
             const compareContent = await git.show([`${compareRef}:${normalizedPath}`]);
-            
+
             // Use a scheme-based URI that won't persist
             const compareUri = vscode.Uri.parse(`git-diff:${path.basename(absolutePath)} (${compareLabel}).${path.extname(absolutePath)}`).with({
                 scheme: 'git-diff',
                 query: Buffer.from(compareContent).toString('base64')
             });
-            
+
             // Register a content provider for our custom scheme
             const disposable = vscode.workspace.registerTextDocumentContentProvider('git-diff', {
-                provideTextDocumentContent(uri: vscode.Uri): string {
+                provideTextDocumentContent(uri: vscode.Uri): string
+                {
                     return Buffer.from(uri.query, 'base64').toString('utf-8');
                 }
             });
-            
+
             // Open current file
             const currentUri = vscode.Uri.file(absolutePath);
-            
+
             // Open diff editor
             await vscode.commands.executeCommand(
                 'vscode.diff',
@@ -2492,13 +2493,13 @@ Keep the summary focused and easy to understand.`;
                 currentUri,
                 `${path.basename(absolutePath)} (${compareLabel} ↔ Working Tree)`
             );
-            
+
             // Dispose the provider after a delay to allow the diff to open
             setTimeout(() => disposable.dispose(), 1000);
         } catch (error)
         {
             console.error('Side-by-side diff failed:', error);
-            
+
             // Try alternative: just open the file with git extension
             try
             {
