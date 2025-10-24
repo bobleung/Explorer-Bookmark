@@ -11,7 +11,7 @@ import { GitHubService } from "../services/GitHubService";
 import { CommentService } from "../services/CommentService";
 const simpleGit = require('simple-git');
 
-export class DirectoryWorker
+export class DirectoryWorker 
 {
     readonly vsCodeExtensionConfigurationKey: string = "explorer-bookmark";
     readonly saveWorkspaceConfigurationSettingKey: string = "saveWorkspace";
@@ -35,20 +35,19 @@ export class DirectoryWorker
     {
         if (element && element.contextValue === this.sectionContextValue)
         {
-            // Return directories in this section
             const section = this.bookmarkSections.find(s => s.id === element.sectionId);
             if (section)
             {
                 return this.createDirectoryEntries(section.directories, section.id);
             }
             return [];
-        } else if (element && element.sectionId)
+        }
+        else if (element && element.sectionId) 
         {
-            // Expand a directory within a section
             return this.directorySearch(element.resourceUri);
-        } else
+        }
+        else
         {
-            // Return root level (sections)
             return this.createSectionEntries();
         }
     }
@@ -61,7 +60,7 @@ export class DirectoryWorker
         this.saveSections();
     }
 
-    public async removeSection(sectionId: string): Promise<void>
+    public async removeSection(sectionId: string): Promise<void> 
     {
         const index = this.bookmarkSections.findIndex(s => s.id === sectionId);
         if (index > -1)
@@ -75,16 +74,15 @@ export class DirectoryWorker
     {
         if (uri)
         {
-            // Check if we have a workspace
             const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
                 ? this.workspaceRoot[0].uri.fsPath
                 : undefined;
 
-            // If we have a workspace, check if the file is within it
+            // TODO: proveri da li radi kako treba
             if (workspaceRoot)
             {
                 const relativePath = path.relative(workspaceRoot, uri.fsPath);
-                if (relativePath.startsWith('..'))
+                if (relativePath.startsWith('..')) 
                 {
                     const result = await vscode.window.showWarningMessage(
                         `The selected file is outside the current workspace and may not work properly with Git features.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}\n\nDo you want to bookmark it anyway?`,
@@ -101,36 +99,37 @@ export class DirectoryWorker
             const currentUser = await this.getCurrentUser();
             const typedDirectory = await buildTypedDirectory(uri, undefined, undefined, currentUser);
 
-            // Convert to relative path for storage if we have a workspace root
-
+            // convert to relative path for storage if we have a workspace root
             if (workspaceRoot && path.isAbsolute(typedDirectory.path))
             {
-                // Store as relative path
+                // store as relative path
                 const relativePath = path.relative(workspaceRoot, typedDirectory.path);
                 typedDirectory.path = relativePath;
             }
 
-            // If no section specified, use default or ask user
+            // if no section specified, use default or ask user
             let targetSectionId = sectionId;
             if (!targetSectionId)
             {
                 if (this.bookmarkSections.length === 0)
                 {
-                    // Create default section if none exist
+                    // create default section if none exist
                     const defaultSection = BookmarkSection.createDefault();
                     this.bookmarkSections.push(defaultSection);
                     targetSectionId = defaultSection.id;
-                } else if (this.bookmarkSections.length === 1)
+                }
+                else if (this.bookmarkSections.length === 1)
                 {
-                    // Use the only section
+                    // use the only section
                     targetSectionId = this.bookmarkSections[0].id;
-                } else
+                }
+                else
                 {
-                    // Ask user to select section
+                    // ask user to select section
                     targetSectionId = await this.askUserForSection();
                     if (!targetSectionId)
                     {
-                        return; // User cancelled
+                        return; // user cancelled
                     }
                 }
             }
@@ -154,11 +153,11 @@ export class DirectoryWorker
 
             if (sectionId)
             {
-                // Remove from specific section
+                // remove from specific section
                 const section = this.bookmarkSections.find(s => s.id === sectionId);
                 if (section)
                 {
-                    // Find the relative path to remove
+                    // find the relative path to remove
                     let pathToRemove = uri.fsPath;
                     if (workspaceRoot && path.isAbsolute(pathToRemove))
                     {
@@ -168,10 +167,10 @@ export class DirectoryWorker
                 }
             } else
             {
-                // Remove from all sections
+                // remove from all sections
                 for (const section of this.bookmarkSections)
                 {
-                    // Find the relative path to remove
+                    // find the relative path to remove
                     let pathToRemove = uri.fsPath;
                     if (workspaceRoot && path.isAbsolute(pathToRemove))
                     {
@@ -220,7 +219,7 @@ export class DirectoryWorker
             {
                 const summary = await AIService.generateFileSummary(uri);
 
-                // Find and update the bookmark
+                // find and update the bookmark
                 for (const section of this.bookmarkSections)
                 {
                     const bookmark = section.directories.find(d => d.path === uri.fsPath);
@@ -232,14 +231,14 @@ export class DirectoryWorker
                     }
                 }
 
-                // Open summary in a new tab to the side
+                // open summary in a new tab to the side
                 const doc = await vscode.workspace.openTextDocument({
                     content: summary,
                     language: 'markdown'
                 });
                 await vscode.window.showTextDocument(doc, {
                     viewColumn: vscode.ViewColumn.Beside,
-                    preview: false // Ensure it opens as a permanent tab
+                    preview: false // ensure it opens as a permanent tab
                 });
             });
         } catch (error)
@@ -253,7 +252,7 @@ export class DirectoryWorker
     {
         try
         {
-            // Always generate a fresh summary and open in new tab
+            // always generate a fresh summary and open in new tab
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: "Generating AI summary...",
@@ -262,7 +261,7 @@ export class DirectoryWorker
             {
                 const summary = await AIService.generateFileSummary(uri);
 
-                // Find and update the bookmark with the new summary
+                // find and update the bookmark with the new summary
                 const result = this.findBookmarkOrParentByUri(uri);
                 if (result)
                 {
@@ -270,7 +269,7 @@ export class DirectoryWorker
                     this.saveSections();
                 }
 
-                // Create and show a webview panel with markdown content
+                // create and show a webview panel with markdown content
                 const filename = path.basename(uri.fsPath);
                 const panel = vscode.window.createWebviewPanel(
                     'aiSummary',
@@ -282,7 +281,7 @@ export class DirectoryWorker
                     }
                 );
 
-                // Simple HTML rendering of markdown content
+                // simple HTML rendering of markdown content
                 const htmlContent = summary
                     .replace(/\n/g, '<br>')
                     .replace(/### (.*?)(<br>|$)/g, '<h3>$1</h3>')
@@ -397,7 +396,7 @@ export class DirectoryWorker
             return;
         }
 
-        // Handle both absolute and relative paths
+        // handle both absolute and relative paths
         const filePath = path.isAbsolute(uri.fsPath)
             ? uri.fsPath
             : path.join(workspaceRoot, uri.fsPath);
@@ -1943,19 +1942,19 @@ Keep the summary focused and easy to understand.`;
 
     private findBookmarkByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null
     {
-        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+        var workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
             ? this.workspaceRoot[0].uri.fsPath
             : undefined;
 
         for (const section of this.bookmarkSections)
         {
-            const bookmark = section.directories.find(d =>
+            var bookmark = section.directories.find(d =>
             {
                 // Handle both relative and absolute path matching
                 if (workspaceRoot && !path.isAbsolute(d.path))
                 {
                     // Use path.join instead of path.resolve to avoid Windows path issues
-                    const absolutePath = path.join(workspaceRoot, d.path);
+                    var absolutePath = path.join(workspaceRoot, d.path);
                     // Compare using fsPath to normalize paths properly on Windows
                     return absolutePath === uri.fsPath;
                 }
@@ -2410,18 +2409,17 @@ Keep the summary focused and easy to understand.`;
 
     private async presentDiffOptions(diff: string, fileName: string, compareInfo: string, absolutePath?: string, diffType?: string, remoteBranch?: string): Promise<void>
     {
-        // First, show the side-by-side diff by default if available
+        // prvo pokazi side-by-side diff ako ima path
         if (absolutePath)
         {
             await this.showSideBySideDiff(absolutePath, compareInfo, diffType, remoteBranch);
         }
         else
         {
-            // Fallback to text diff if no path available
+            // fallback na text diff ako nema path
             await this.showDiffInEditor(diff, fileName, compareInfo);
         }
 
-        // Then offer additional options
         const action = await vscode.window.showInformationMessage(
             `Git diff: ${compareInfo}`,
             'View Raw Diff', 'AI Summarize Diff', 'Close'
@@ -2455,7 +2453,7 @@ Keep the summary focused and easy to understand.`;
             const relativePath = path.relative(workspaceRoot, absolutePath);
             const normalizedPath = relativePath.replace(/\\/g, '/');
 
-            // Determine which version to compare against
+            // odredi sa kojom verzijom da poredi
             let compareRef = 'HEAD';
             let compareLabel = 'HEAD';
 
@@ -2465,17 +2463,17 @@ Keep the summary focused and easy to understand.`;
                 compareLabel = remoteBranch;
             }
 
-            // Get comparison content using simple-git
+            // uzmi sadrzaj iz gita
             const git = simpleGit(workspaceRoot);
             const compareContent = await git.show([`${compareRef}:${normalizedPath}`]);
 
-            // Use a scheme-based URI that won't persist
+            // napravi URI koji nece da ostane otvoren posle
             const compareUri = vscode.Uri.parse(`git-diff:${path.basename(absolutePath)} (${compareLabel}).${path.extname(absolutePath)}`).with({
                 scheme: 'git-diff',
                 query: Buffer.from(compareContent).toString('base64')
             });
 
-            // Register a content provider for our custom scheme
+            // registruj provider za custom scheme
             const disposable = vscode.workspace.registerTextDocumentContentProvider('git-diff', {
                 provideTextDocumentContent(uri: vscode.Uri): string
                 {
@@ -2483,10 +2481,10 @@ Keep the summary focused and easy to understand.`;
                 }
             });
 
-            // Open current file
+            // otvori trenutni fajl
             const currentUri = vscode.Uri.file(absolutePath);
 
-            // Open diff editor
+            // otvori diff editor konacno
             await vscode.commands.executeCommand(
                 'vscode.diff',
                 compareUri,
@@ -2494,13 +2492,13 @@ Keep the summary focused and easy to understand.`;
                 `${path.basename(absolutePath)} (${compareLabel} ↔ Working Tree)`
             );
 
-            // Dispose the provider after a delay to allow the diff to open
+            // dispose provider posle delay da se otvori diff normalno
             setTimeout(() => disposable.dispose(), 1000);
         } catch (error)
         {
             console.error('Side-by-side diff failed:', error);
 
-            // Try alternative: just open the file with git extension
+            // probaj alternative ako ne radi
             try
             {
                 const fileUri = vscode.Uri.file(absolutePath);

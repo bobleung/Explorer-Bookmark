@@ -11,6 +11,7 @@ export interface TeamBookmarkConfig
     sections: BookmarkSection[];
 }
 
+// za team bookmarks
 export class TeamBookmarkService
 {
     private static readonly BOOKMARK_FILE_NAME = '.vscode/team-bookmarks.json';
@@ -24,7 +25,7 @@ export class TeamBookmarkService
             return;
         }
 
-        // Convert absolute paths to relative paths for team sharing
+        // prebaci absolute u relative paths
         const sectionsWithRelativePaths = this.convertToRelativePaths(sections, workspaceRoot);
 
         const config: TeamBookmarkConfig = {
@@ -39,7 +40,6 @@ export class TeamBookmarkService
 
         try
         {
-            // Ensure .vscode directory exists
             const vscodeDirPath = path.join(workspaceRoot, '.vscode');
             const vscodeDirUri = vscode.Uri.file(vscodeDirPath);
 
@@ -51,7 +51,6 @@ export class TeamBookmarkService
                 await vscode.workspace.fs.createDirectory(vscodeDirUri);
             }
 
-            // Write the bookmark file
             const fileUri = vscode.Uri.file(bookmarkFilePath);
             await vscode.workspace.fs.writeFile(fileUri, Buffer.from(configJson, 'utf8'));
 
@@ -80,7 +79,7 @@ export class TeamBookmarkService
 
             if (workspaceRoot)
             {
-                // Try to import from workspace file
+                // try to import from workspace file
                 const bookmarkFilePath = path.join(workspaceRoot, this.BOOKMARK_FILE_NAME);
                 fileUri = vscode.Uri.file(bookmarkFilePath);
 
@@ -89,12 +88,13 @@ export class TeamBookmarkService
                     await vscode.workspace.fs.stat(fileUri);
                 } catch
                 {
-                    // File doesn't exist, show file picker
+                    // file doesn't exist, show file picker
                     return await this.importFromFile();
                 }
-            } else
+            }
+            else
             {
-                // Show file picker
+                // show file picker
                 return await this.importFromFile();
             }
 

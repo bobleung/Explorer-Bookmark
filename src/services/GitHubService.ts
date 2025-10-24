@@ -60,6 +60,7 @@ export interface PRComment
     updatedAt: Date;
 }
 
+// github api pozivi
 export class GitHubService
 {
     private token: string | undefined;
@@ -72,7 +73,6 @@ export class GitHubService
 
     private getGitHubToken(): string | undefined
     {
-        // Try to get token from VS Code settings or environment
         const config = vscode.workspace.getConfiguration('folderHub');
         let token = config.get<string>('githubToken');
 
@@ -93,7 +93,7 @@ export class GitHubService
 
         const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`;
 
-        // Use VS Code's built-in HTTP client or a simple implementation
+        // use VS Code's built-in HTTP client or a simple implementation
         try
         {
             const https = require('https');

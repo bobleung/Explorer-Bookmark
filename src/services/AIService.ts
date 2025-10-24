@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
+// AI analiza fajlova pomocu Copilot-a
 export class AIService
 {
-    private static readonly MAX_FILE_SIZE = 100000; // 100KB limit for analysis
+    private static readonly MAX_FILE_SIZE = 100000;
     private static readonly SUPPORTED_EXTENSIONS = [
         '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cs', '.cpp', '.c', '.h',
         '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.dart', '.scala', '.sh',
@@ -15,27 +16,25 @@ export class AIService
     {
         try
         {
-            // Check if file type is supported
             const ext = path.extname(uri.fsPath).toLowerCase();
             if (!this.SUPPORTED_EXTENSIONS.includes(ext))
             {
                 return "File type not supported for AI analysis.";
             }
 
-            // Check file size
             const stat = await vscode.workspace.fs.stat(uri);
             if (stat.size > this.MAX_FILE_SIZE)
             {
                 return "File too large for AI analysis (>100KB).";
             }
 
-            // Read file content
+            // citaj fajl
             const content = await vscode.workspace.fs.readFile(uri);
             const textContent = Buffer.from(content).toString('utf8');
 
-            // Use GitHub Copilot to generate the summary
             return await this.generateCopilotSummary(textContent, path.basename(uri.fsPath), ext);
-        } catch (error)
+        }
+        catch (error)
         {
             console.error('Error generating AI summary:', error);
             return "Error generating summary. File may not be accessible or GitHub Copilot may be unavailable.";
@@ -46,7 +45,6 @@ export class AIService
     {
         try
         {
-            // Try multiple Copilot API access methods for custom prompts
             return await this.generateCopilotCustomSummary(prompt);
         } catch (error)
         {
@@ -59,21 +57,21 @@ export class AIService
     {
         try
         {
-            // Create a prompt for GitHub Copilot to analyze the file
             const prompt = this.createAnalysisPrompt(content, filename, extension);
 
-            // Use VS Code's GitHub Copilot API to get the summary
+            // zovi copilot api
             const copilotResponse = await this.invokeCopilotAPI(prompt);
 
             if (copilotResponse)
             {
                 return this.formatCopilotResponse(copilotResponse, filename);
-            } else
+            }
+            else
             {
-                // Open interactive Copilot session
                 return await this.generateInteractiveSummary(content, filename, extension, prompt);
             }
-        } catch (error)
+        }
+        catch (error)
         {
             console.error('Error invoking GitHub Copilot:', error);
             return "GitHub Copilot is required for AI summaries. Please ensure GitHub Copilot is installed, active, and you are signed in.";
@@ -84,7 +82,7 @@ export class AIService
     {
         try
         {
-            // Use VS Code's GitHub Copilot API to get the summary
+            // use VS Code's GitHub Copilot API to get the summary
             const copilotResponse = await this.invokeCopilotAPI(prompt);
 
             if (copilotResponse)
@@ -178,7 +176,7 @@ Format the response in markdown with clear sections and bullet points.`;
     {
         try
         {
-            // Check if GitHub Copilot extension is available
+            // check if GitHub Copilot extension is available
             const copilotExtension = vscode.extensions.getExtension('GitHub.copilot');
             if (!copilotExtension)
             {
@@ -186,16 +184,16 @@ Format the response in markdown with clear sections and bullet points.`;
                 return null;
             }
 
-            // Ensure the extension is activated
+            // ensure the extension is activated
             if (!copilotExtension.isActive)
             {
                 await copilotExtension.activate();
             }
 
-            // Try to use GitHub Copilot Chat API if available
+            // try to use GitHub Copilot Chat API if available
             try
             {
-                // First try the newer language model API (VS Code 1.90+)
+                // first try the newer language model API (VS Code 1.90+)
                 if ('lm' in vscode && typeof (vscode as any).lm?.selectChatModels === 'function')
                 {
                     const models = await (vscode as any).lm.selectChatModels({
@@ -226,10 +224,10 @@ Format the response in markdown with clear sections and bullet points.`;
                 console.log('Language model API not available, trying alternative methods:', lmError);
             }
 
-            // Try using Copilot commands
+            // try using Copilot commands
             try
             {
-                // Try different command variations that might be available
+                // try different command variations that might be available
                 const commands = [
                     'github.copilot.generate',
                     'github.copilot.chat.explainThis',
@@ -252,16 +250,17 @@ Format the response in markdown with clear sections and bullet points.`;
                         }
                     } catch (cmdError)
                     {
-                        // Try next command
+                        // try next command
                         continue;
                     }
                 }
-            } catch (commandError)
+            }
+            catch (commandError)
             {
                 console.error('Error using Copilot commands:', commandError);
             }
 
-            // Try accessing Copilot extension API directly
+            // try accessing Copilot extension API directly
             try
             {
                 const api = copilotExtension.exports;
@@ -278,7 +277,7 @@ Format the response in markdown with clear sections and bullet points.`;
                 console.error('Error accessing Copilot API:', apiError);
             }
 
-            // If all methods fail, show a helpful message
+            // if all methods fail, show a helpful message
             vscode.window.showInformationMessage(
                 'GitHub Copilot is installed but the API is not accessible. Please ensure you have the latest version and are signed in.',
                 'Open Copilot Chat'

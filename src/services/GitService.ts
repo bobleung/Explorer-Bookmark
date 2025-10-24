@@ -28,14 +28,7 @@ export interface FileHistory
     commits: CommitInfo[];
 }
 
-export interface StashEntry
-{
-    index: number;
-    message: string;
-    branch: string;
-    date: Date;
-}
-
+// git operacije
 export class GitService
 {
     private git: SimpleGit;
@@ -47,7 +40,6 @@ export class GitService
         this.git = simpleGit(workspaceRoot);
     }
 
-    // Branch Management
     async getCurrentBranch(): Promise<string>
     {
         try
@@ -61,6 +53,7 @@ export class GitService
         }
     }
 
+    // sve grane
     async getAllBranches(): Promise<BranchInfo[]>
     {
         try
@@ -87,52 +80,7 @@ export class GitService
         }
     }
 
-    async createBranch(branchName: string, startPoint?: string): Promise<boolean>
-    {
-        try
-        {
-            if (startPoint)
-            {
-                await this.git.checkoutBranch(branchName, startPoint);
-            } else
-            {
-                await this.git.checkoutLocalBranch(branchName);
-            }
-            return true;
-        } catch (error)
-        {
-            console.error('Error creating branch:', error);
-            return false;
-        }
-    }
-
-    async switchBranch(branchName: string): Promise<boolean>
-    {
-        try
-        {
-            await this.git.checkout(branchName);
-            return true;
-        } catch (error)
-        {
-            console.error('Error switching branch:', error);
-            return false;
-        }
-    }
-
-    async deleteBranch(branchName: string, force: boolean = false): Promise<boolean>
-    {
-        try
-        {
-            await this.git.deleteLocalBranch(branchName, force);
-            return true;
-        } catch (error)
-        {
-            console.error('Error deleting branch:', error);
-            return false;
-        }
-    }
-
-    // File History and Changes
+    // file history and changes
     async getFileHistory(filePath: string, maxCount: number = 20): Promise<FileHistory>
     {
         try
@@ -141,12 +89,12 @@ export class GitService
 
             if (path.isAbsolute(filePath))
             {
-                // Convert absolute to relative
+                // convert absolute to relative
                 const normalizedWorkspace = path.resolve(this.workspaceRoot);
                 const normalizedFile = path.resolve(filePath);
                 relativePath = path.relative(normalizedWorkspace, normalizedFile);
 
-                // Validate path is within workspace
+                // validate path is within workspace
                 if (relativePath.startsWith('..'))
                 {
                     throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
@@ -154,10 +102,10 @@ export class GitService
             }
             else
             {
-                // Already relative, use directly
+                // already relative, use directly
                 relativePath = filePath;
 
-                // Basic validation for relative paths
+                // basic validation for relative paths
                 if (relativePath.startsWith('..'))
                 {
                     throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
@@ -178,7 +126,8 @@ export class GitService
                 file: relativePath,
                 commits
             };
-        } catch (error)
+        }
+        catch (error)
         {
             console.error('Error getting file history:', error);
             return { file: filePath, commits: [] };
@@ -225,60 +174,6 @@ export class GitService
         } catch (error)
         {
             console.error('Error getting file changes:', error);
-            return '';
-        }
-    }
-
-    async getUnstagedChanges(filePath?: string): Promise<string>
-    {
-        try
-        {
-            const args = ['--no-index', '/dev/null'];
-            if (filePath)
-            {
-                const relativePath = path.relative(this.workspaceRoot, filePath);
-                args.push(relativePath);
-            }
-
-            const diff = await this.git.diff(args);
-            return diff;
-        } catch (error)
-        {
-            console.error('Error getting unstaged changes:', error);
-            return '';
-        }
-    }
-
-    async getStagedChanges(filePath?: string): Promise<string>
-    {
-        try
-        {
-            const args = ['--cached'];
-            if (filePath)
-            {
-                const relativePath = path.relative(this.workspaceRoot, filePath);
-
-                // Check if the file is within the workspace/repository
-                if (relativePath.startsWith('..'))
-                {
-                    throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
-                }
-
-                args.push('--', relativePath);
-            }
-
-            const diff = await this.git.diff(args);
-            return diff;
-        } catch (error)
-        {
-            console.error('Error getting staged changes:', error);
-
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes('outside') || errorMessage.includes('repository')) 
-            {
-                return `Error: The selected file is outside the current Git repository.\nRepository: ${this.workspaceRoot}\nFile: ${filePath || 'unknown'}`;
-            }
-
             return '';
         }
     }
@@ -506,51 +401,6 @@ export class GitService
         }
     }
 
-    async abortRebase(): Promise<boolean>
-    {
-        try
-        {
-            await this.git.rebase(['--abort']);
-            return true;
-        } catch (error)
-        {
-            console.error('Error aborting rebase:', error);
-            return false;
-        }
-    }
-
-    async continueRebase(): Promise<boolean>
-    {
-        try
-        {
-            await this.git.rebase(['--continue']);
-            return true;
-        } catch (error)
-        {
-            console.error('Error continuing rebase:', error);
-            return false;
-        }
-    }
-
-    async push(branch?: string): Promise<boolean>
-    {
-        try
-        {
-            if (branch)
-            {
-                await this.git.push('origin', branch);
-            } else
-            {
-                await this.git.push();
-            }
-            return true;
-        } catch (error)
-        {
-            console.error('Error pushing:', error);
-            return false;
-        }
-    }
-
     async stageCommitAndPushFiles(filePaths: string[], commitMessage: string): Promise<{ success: boolean, message: string }>
     {
         try
@@ -644,24 +494,6 @@ export class GitService
     }
 
     // Stash Operations
-    async getStashList(): Promise<StashEntry[]>
-    {
-        try
-        {
-            const stashList = await this.git.stashList();
-            return stashList.all.map((stash, index) => ({
-                index,
-                message: stash.message,
-                branch: stash.refs || 'unknown',
-                date: new Date(stash.date)
-            }));
-        } catch (error)
-        {
-            console.error('Error getting stash list:', error);
-            return [];
-        }
-    }
-
     async stashChanges(message?: string, includeUntracked: boolean = false): Promise<boolean>
     {
         try
@@ -676,38 +508,6 @@ export class GitService
         } catch (error)
         {
             console.error('Error stashing changes:', error);
-            return false;
-        }
-    }
-
-    async applyStash(stashIndex?: number): Promise<boolean>
-    {
-        try
-        {
-            if (stashIndex !== undefined)
-            {
-                await this.git.stash(['apply', `stash@{${stashIndex}}`]);
-            } else
-            {
-                await this.git.stash(['apply']);
-            }
-            return true;
-        } catch (error)
-        {
-            console.error('Error applying stash:', error);
-            return false;
-        }
-    }
-
-    async dropStash(stashIndex: number): Promise<boolean>
-    {
-        try
-        {
-            await this.git.stash(['drop', `stash@{${stashIndex}}`]);
-            return true;
-        } catch (error)
-        {
-            console.error('Error dropping stash:', error);
             return false;
         }
     }
@@ -769,71 +569,6 @@ export class GitService
             return {
                 conflictStatus: 'none'
             };
-        }
-    }
-
-    async isFileTracked(filePath: string): Promise<boolean>
-    {
-        try
-        {
-            const relativePath = path.relative(this.workspaceRoot, filePath);
-            await this.git.raw(['ls-files', '--error-unmatch', relativePath]);
-            return true;
-        } catch (error)
-        {
-            return false;
-        }
-    }
-
-    async getFileBlame(filePath: string): Promise<string>
-    {
-        try
-        {
-            const relativePath = path.relative(this.workspaceRoot, filePath);
-            const blame = await this.git.raw(['blame', relativePath]);
-            return blame;
-        } catch (error)
-        {
-            console.error('Error getting file blame:', error);
-            return '';
-        }
-    }
-
-    // Utility Methods
-    async isGitRepository(): Promise<boolean>
-    {
-        try
-        {
-            await this.git.status();
-            return true;
-        } catch (error)
-        {
-            return false;
-        }
-    }
-
-    async getRepositoryRoot(): Promise<string>
-    {
-        try
-        {
-            const root = await this.git.revparse(['--show-toplevel']);
-            return root.trim();
-        } catch (error)
-        {
-            return this.workspaceRoot;
-        }
-    }
-
-    async getRemoteUrl(remoteName: string = 'origin'): Promise<string>
-    {
-        try
-        {
-            const url = await this.git.getConfig(`remote.${remoteName}.url`);
-            return typeof url === 'string' ? url : url?.value || '';
-        } catch (error)
-        {
-            console.error('Error getting remote URL:', error);
-            return '';
         }
     }
 
@@ -1064,19 +799,6 @@ export class GitService
         }
     }
 
-    async continueCherryPick(): Promise<boolean>
-    {
-        try
-        {
-            await this.git.raw(['cherry-pick', '--continue']);
-            return true;
-        } catch (error)
-        {
-            console.error('Error continuing cherry-pick:', error);
-            return false;
-        }
-    }
-
     // Git Add, Commit, and File-Specific Stash operations
     async stageFile(filePath: string): Promise<{ success: boolean, message: string }>
     {
@@ -1254,36 +976,6 @@ export class GitService
             return {
                 success: false,
                 message: `Failed to commit file: ${error.message || error}`
-            };
-        }
-    }
-
-    async commitStagedChanges(message: string): Promise<{ success: boolean, message: string }>
-    {
-        try
-        {
-            const status = await this.git.status();
-
-            if (status.staged.length === 0)
-            {
-                return {
-                    success: false,
-                    message: 'No staged changes to commit'
-                };
-            }
-
-            await this.git.commit(message);
-
-            return {
-                success: true,
-                message: `Successfully committed ${status.staged.length} file(s)`
-            };
-        } catch (error: any)
-        {
-            console.error('Error committing staged changes:', error);
-            return {
-                success: false,
-                message: `Failed to commit: ${error.message || error}`
             };
         }
     }

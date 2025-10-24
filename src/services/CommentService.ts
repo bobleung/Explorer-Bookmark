@@ -32,6 +32,7 @@ export interface CommentFilter
     dateRange?: { start: Date; end: Date };
 }
 
+// komentari na bookmarkove
 export class CommentService
 {
     private notifications: CommentNotification[] = [];
@@ -39,13 +40,12 @@ export class CommentService
 
     constructor() { }
 
-    // Comment Thread Management
     getCommentThreads(item: TypedDirectory): CommentThread[]
     {
         const threads: CommentThread[] = [];
         const processedComments = new Set<string>();
 
-        // Find root comments (those without parentId)
+        // nadji root komentare
         const rootComments = item.comments.filter(c => !c.parentId);
 
         for (const rootComment of rootComments)
@@ -80,7 +80,7 @@ export class CommentService
         for (const reply of directReplies)
         {
             replies.push(reply);
-            // Recursively get nested replies
+            // recursively get nested replies
             replies.push(...this.getRepliesForComment(item, reply.id));
         }
 

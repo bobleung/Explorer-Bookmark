@@ -3,7 +3,7 @@ export enum vsCodeCommands
     Open = 'vscode.open',
 };
 
-export enum DirectoryProviderCommands
+export enum DirectoryProviderCommands 
 {
     SelectItem = 'directoryprovider/selectitem',
     OpenItem = 'directoryprovider/openitem',
@@ -16,23 +16,25 @@ export enum DirectoryProviderCommands
     SelectItemToSection = 'directoryprovider/selectitemtosection',
     ViewAISummary = 'directoryprovider/viewaisummary',
     ShowGitDiff = 'directoryprovider/showgitdiff',
+
+    // team bookmark stvari
     ExportTeamBookmarks = 'directoryprovider/exportteambookmarks',
     ImportTeamBookmarks = 'directoryprovider/importteambookmarks',
     SyncTeamBookmarks = 'directoryprovider/syncteambookmarks',
     InjectTeamBookmarks = 'directoryprovider/injectteambookmarks',
+
     AddBookmarkComment = 'directoryprovider/addbookmarkcomment',
     AddBookmarkTags = 'directoryprovider/addbookmarktags',
-    // New Collaborative Commands
     AddComment = 'directoryprovider/addcomment',
     UpdateStatus = 'directoryprovider/updatestatus',
     UpdatePriority = 'directoryprovider/updatepriority',
+
     CreatePR = 'directoryprovider/createpr',
     LinkPR = 'directoryprovider/linkpr',
     ShowGitHub = 'directoryprovider/showgithub',
     SetupGitHub = 'directoryprovider/setupgithub',
-    // Cherry-pick Commands
+
     CherryPickChanges = 'directoryprovider/cherrypickchanges',
-    // Git Operations Commands
     GitAddFile = 'directoryprovider/gitaddfile',
     GitCommitFile = 'directoryprovider/gitcommitfile',
     GitStashFile = 'directoryprovider/gitstashfile',

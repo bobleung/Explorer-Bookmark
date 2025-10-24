@@ -4,23 +4,16 @@ import { DirectoryWorker } from "../operator/DirectoryWorker";
 import { GitHubService } from "../services/GitHubService";
 import { GitService } from "../services/GitService";
 
-export class DirectoryProvider
-  implements vscode.TreeDataProvider<FileSystemObject>
+export class DirectoryProvider implements vscode.TreeDataProvider<FileSystemObject>
 {
-  private _onDidChangeTreeData: vscode.EventEmitter<
-    FileSystemObject | undefined | null | void
-  > = new vscode.EventEmitter<FileSystemObject | undefined | null | void>();
+  private _onDidChangeTreeData: vscode.EventEmitter<FileSystemObject | undefined | null | void> =
+    new vscode.EventEmitter<FileSystemObject | undefined | null | void>();
 
-  readonly onDidChangeTreeData: vscode.Event<
-    FileSystemObject | undefined | null | void
-  > = this._onDidChangeTreeData.event;
+  readonly onDidChangeTreeData: vscode.Event<FileSystemObject | undefined | null | void> =
+    this._onDidChangeTreeData.event;
 
-  constructor(
-    private directoryOperator: DirectoryWorker,
-  )
-  { }
+  constructor(private directoryOperator: DirectoryWorker) { }
 
-  // Get current user identifier (git username or fallback)
   private async getCurrentUser(): Promise<string>
   {
     try
@@ -35,14 +28,11 @@ export class DirectoryProvider
     {
       console.error('Error getting git user:', error);
     }
-
-    // Fallback to shortened machine ID if git not available
+    // fallback
     return vscode.env.machineId.substring(0, 8);
   }
 
-  getTreeItem(
-    element: FileSystemObject
-  ): vscode.TreeItem | Thenable<vscode.TreeItem>
+  getTreeItem(element: FileSystemObject): vscode.TreeItem | Thenable<vscode.TreeItem> 
   {
     return element;
   }
@@ -143,6 +133,7 @@ export class DirectoryProvider
     await this.directoryOperator.gitOperations();
   }
 
+  // team bookmark export/import
   async exportTeamBookmarks()
   {
     await this.directoryOperator.exportTeamBookmarks();
@@ -252,6 +243,7 @@ export class DirectoryProvider
     await this.directoryOperator.showOnGitHub(uri);
   }
 
+  // TODO: sta tacno ovo radi
   async generateShareableConfig()
   {
     await this.directoryOperator.generateShareableConfig();
