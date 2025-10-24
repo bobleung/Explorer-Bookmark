@@ -118,6 +118,31 @@ export class DirectoryProvider
     await this.directoryOperator.gitStashFile(uri);
   }
 
+  async gitPushBookmarkedFiles()
+  {
+    await this.directoryOperator.gitPushBookmarkedFiles();
+  }
+
+  async gitFetch()
+  {
+    await this.directoryOperator.gitFetch();
+  }
+
+  async gitPull()
+  {
+    await this.directoryOperator.gitPull();
+  }
+
+  async gitRebase()
+  {
+    await this.directoryOperator.gitRebase();
+  }
+
+  async gitOperations()
+  {
+    await this.directoryOperator.gitOperations();
+  }
+
   async exportTeamBookmarks()
   {
     await this.directoryOperator.exportTeamBookmarks();

@@ -133,6 +133,26 @@
         "icon": "$(archive)"
       },
       {
+        "command": "directoryprovider/gitpushbookmarkedfiles",
+        "title": "Git: Push All Bookmarked Files",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "directoryprovider/gitfetch",
+        "title": "Git: Fetch",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "directoryprovider/gitpull",
+        "title": "Git: Pull",
+        "icon": "$(repo-pull)"
+      },
+      {
+        "command": "directoryprovider/gitrebase",
+        "title": "Git: Rebase",
+        "icon": "$(git-merge)"
+      },
+      {
         "command": "directoryprovider/exportteambookmarks",
         "title": "Export Team Bookmarks",
         "icon": "$(export)"
@@ -186,6 +206,11 @@
         "command": "directoryprovider/setupgithub",
         "title": "Setup GitHub Integration",
         "icon": "$(key)"
+      },
+      {
+        "command": "directoryprovider/gitoperations",
+        "title": "Git Operations",
+        "icon": "$(git-branch)"
       }
     ],
     "menus": {
@@ -229,6 +254,11 @@
           "command": "directoryprovider/setupgithub",
           "when": "view == explorer-bookmark",
           "group": "github"
+        },
+        {
+          "command": "directoryprovider/gitoperations",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
         }
       ],
       "explorer/context": [

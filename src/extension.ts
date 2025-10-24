@@ -146,6 +146,26 @@ export function activate(context: vscode.ExtensionContext)
         (args) => directoryProvider.gitStashFile(args.resourceUri)
       ),
       vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitPushBookmarkedFiles,
+        () => directoryProvider.gitPushBookmarkedFiles()
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitFetch,
+        () => directoryProvider.gitFetch()
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitPull,
+        () => directoryProvider.gitPull()
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitRebase,
+        () => directoryProvider.gitRebase()
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.GitOperations,
+        () => directoryProvider.gitOperations()
+      ),
+      vscode.commands.registerCommand(
         DirectoryProviderCommands.ExportTeamBookmarks,
         () => directoryProvider.exportTeamBookmarks()
       ),

@@ -36,4 +36,9 @@ export enum DirectoryProviderCommands
     GitAddFile = 'directoryprovider/gitaddfile',
     GitCommitFile = 'directoryprovider/gitcommitfile',
     GitStashFile = 'directoryprovider/gitstashfile',
+    GitPushBookmarkedFiles = 'directoryprovider/gitpushbookmarkedfiles',
+    GitFetch = 'directoryprovider/gitfetch',
+    GitPull = 'directoryprovider/gitpull',
+    GitRebase = 'directoryprovider/gitrebase',
+    GitOperations = 'directoryprovider/gitoperations',
 };

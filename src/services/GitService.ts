@@ -477,6 +477,61 @@ export class GitService
         }
     }
 
+    async rebase(branch: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            await this.git.rebase([branch]);
+            return {
+                success: true,
+                message: `Successfully rebased onto ${branch}`
+            };
+        } catch (error: any)
+        {
+            console.error('Error rebasing:', error);
+
+            // Check if it's a conflict
+            if (error.message && error.message.includes('conflict'))
+            {
+                return {
+                    success: false,
+                    message: `Rebase conflict detected. Please resolve conflicts manually.`
+                };
+            }
+
+            return {
+                success: false,
+                message: `Failed to rebase: ${error.message || error}`
+            };
+        }
+    }
+
+    async abortRebase(): Promise<boolean>
+    {
+        try
+        {
+            await this.git.rebase(['--abort']);
+            return true;
+        } catch (error)
+        {
+            console.error('Error aborting rebase:', error);
+            return false;
+        }
+    }
+
+    async continueRebase(): Promise<boolean>
+    {
+        try
+        {
+            await this.git.rebase(['--continue']);
+            return true;
+        } catch (error)
+        {
+            console.error('Error continuing rebase:', error);
+            return false;
+        }
+    }
+
     async push(branch?: string): Promise<boolean>
     {
         try
@@ -493,6 +548,98 @@ export class GitService
         {
             console.error('Error pushing:', error);
             return false;
+        }
+    }
+
+    async stageCommitAndPushFiles(filePaths: string[], commitMessage: string): Promise<{ success: boolean, message: string }>
+    {
+        try
+        {
+            const relativePaths: string[] = [];
+
+            // Convert all paths to relative and validate
+            for (const filePath of filePaths)
+            {
+                let relativePath: string;
+
+                if (path.isAbsolute(filePath))
+                {
+                    const normalizedWorkspace = path.resolve(this.workspaceRoot);
+                    const normalizedFile = path.resolve(filePath);
+                    relativePath = path.relative(normalizedWorkspace, normalizedFile);
+
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`File '${filePath}' is outside the repository at '${this.workspaceRoot}'`);
+                    }
+                }
+                else
+                {
+                    relativePath = filePath;
+
+                    if (relativePath.startsWith('..'))
+                    {
+                        throw new Error(`Relative path '${filePath}' appears to go outside the repository`);
+                    }
+                }
+
+                relativePaths.push(relativePath);
+            }
+
+            // Check if there are any changes to commit
+            const status = await this.git.status();
+            const filesToStage: string[] = [];
+
+            for (const relativePath of relativePaths)
+            {
+                const normalizedPath = relativePath.replace(/\\/g, '/');
+
+                // Check if file has changes (modified, untracked, deleted, etc.)
+                const hasChanges = [
+                    ...status.modified,
+                    ...status.not_added,
+                    ...status.deleted,
+                    ...status.created,
+                    ...status.conflicted
+                ].some(file => file === normalizedPath || file === relativePath);
+
+                // Check if already staged
+                const isStaged = status.staged.includes(normalizedPath) || status.staged.includes(relativePath);
+
+                if (hasChanges || isStaged)
+                {
+                    filesToStage.push(relativePath);
+                }
+            }
+
+            if (filesToStage.length === 0)
+            {
+                return {
+                    success: false,
+                    message: 'No changes to commit in the selected files'
+                };
+            }
+
+            // Stage all files
+            await this.git.add(filesToStage);
+
+            // Commit
+            await this.git.commit(commitMessage);
+
+            // Push to remote
+            await this.git.push();
+
+            return {
+                success: true,
+                message: `Successfully committed and pushed ${filesToStage.length} file(s)`
+            };
+        } catch (error: any)
+        {
+            console.error('Error in stage, commit, and push:', error);
+            return {
+                success: false,
+                message: `Failed to push changes: ${error.message || error}`
+            };
         }
     }
 

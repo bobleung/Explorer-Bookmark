@@ -397,12 +397,17 @@ export class DirectoryWorker
             return;
         }
 
+        // Handle both absolute and relative paths
+        const filePath = path.isAbsolute(uri.fsPath) 
+            ? uri.fsPath 
+            : path.join(workspaceRoot, uri.fsPath);
+
         // Check if the file is within the workspace
-        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
         {
             vscode.window.showErrorMessage(
-                `Cannot show Git diff: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+                `Cannot show Git diff: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${filePath}`
             );
             return;
         }
@@ -454,7 +459,9 @@ export class DirectoryWorker
 
             if (!selectedOption) return;
 
-            await this.handleGitDiffOption(uri, gitService, selectedOption.option, currentBranch);
+            // Create a proper URI with the resolved path
+            const resolvedUri = vscode.Uri.file(filePath);
+            await this.handleGitDiffOption(resolvedUri, gitService, selectedOption.option, currentBranch);
 
         } catch (error)
         {
@@ -475,12 +482,17 @@ export class DirectoryWorker
             return;
         }
 
+        // Handle both absolute and relative paths
+        const filePath = path.isAbsolute(uri.fsPath) 
+            ? uri.fsPath 
+            : path.join(workspaceRoot, uri.fsPath);
+
         // Check if the file is within the workspace
-        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
         {
             vscode.window.showErrorMessage(
-                `Cannot cherry-pick: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+                `Cannot cherry-pick: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${filePath}`
             );
             return;
         }
@@ -540,7 +552,9 @@ export class DirectoryWorker
 
             if (!selectedOption) return;
 
-            await this.handleCherryPickOption(uri, gitService, sourceBranch, selectedOption.option);
+            // Create a proper URI with the resolved path
+            const resolvedUri = vscode.Uri.file(filePath);
+            await this.handleCherryPickOption(resolvedUri, gitService, sourceBranch, selectedOption.option);
 
         } catch (error)
         {
@@ -561,11 +575,16 @@ export class DirectoryWorker
             return;
         }
 
-        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        // Handle both absolute and relative paths
+        const filePath = path.isAbsolute(uri.fsPath) 
+            ? uri.fsPath 
+            : path.join(workspaceRoot, uri.fsPath);
+
+        const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
         {
             vscode.window.showErrorMessage(
-                `Cannot stage file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+                `Cannot stage file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${filePath}`
             );
             return;
         }
@@ -585,12 +604,12 @@ export class DirectoryWorker
             }
 
             // Get file status first
-            const status = await gitService.getFileStatus(uri.fsPath);
+            const status = await gitService.getFileStatus(filePath);
 
             if (status.isStaged)
             {
                 const action = await vscode.window.showInformationMessage(
-                    `'${path.basename(uri.fsPath)}' is already staged. What would you like to do?`,
+                    `'${path.basename(filePath)}' is already staged. What would you like to do?`,
                     'Unstage', 'Cancel'
                 );
 
@@ -602,7 +621,7 @@ export class DirectoryWorker
                         cancellable: false
                     }, async () =>
                     {
-                        const result = await gitService.unstageFile(uri.fsPath);
+                        const result = await gitService.unstageFile(filePath);
 
                         if (result.success)
                         {
@@ -625,7 +644,7 @@ export class DirectoryWorker
                 cancellable: false
             }, async () =>
             {
-                const result = await gitService.stageFile(uri.fsPath);
+                const result = await gitService.stageFile(filePath);
 
                 if (result.success)
                 {
@@ -656,11 +675,16 @@ export class DirectoryWorker
             return;
         }
 
-        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        // Handle both absolute and relative paths
+        const filePath = path.isAbsolute(uri.fsPath) 
+            ? uri.fsPath 
+            : path.join(workspaceRoot, uri.fsPath);
+
+        const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
         {
             vscode.window.showErrorMessage(
-                `Cannot commit file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+                `Cannot commit file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${filePath}`
             );
             return;
         }
@@ -680,17 +704,17 @@ export class DirectoryWorker
             }
 
             // Get file status
-            const status = await gitService.getFileStatus(uri.fsPath);
+            const status = await gitService.getFileStatus(filePath);
 
             if (!status.isModified && !status.isUntracked && !status.isStaged)
             {
-                vscode.window.showInformationMessage(`No changes to commit for '${path.basename(uri.fsPath)}'`);
+                vscode.window.showInformationMessage(`No changes to commit for '${path.basename(filePath)}'`);
                 return;
             }
 
             // Ask for commit message
             const commitMessage = await vscode.window.showInputBox({
-                prompt: `Enter commit message for '${path.basename(uri.fsPath)}'`,
+                prompt: `Enter commit message for '${path.basename(filePath)}'`,
                 placeHolder: 'feat: add new feature',
                 validateInput: (value) =>
                 {
@@ -711,7 +735,7 @@ export class DirectoryWorker
                 cancellable: false
             }, async () =>
             {
-                const result = await gitService.commitFile(uri.fsPath, commitMessage);
+                const result = await gitService.commitFile(filePath, commitMessage);
 
                 if (result.success)
                 {
@@ -742,11 +766,16 @@ export class DirectoryWorker
             return;
         }
 
-        const relativePath = path.relative(workspaceRoot, uri.fsPath);
+        // Handle both absolute and relative paths
+        const filePath = path.isAbsolute(uri.fsPath) 
+            ? uri.fsPath 
+            : path.join(workspaceRoot, uri.fsPath);
+
+        const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
         {
             vscode.window.showErrorMessage(
-                `Cannot stash file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${uri.fsPath}`
+                `Cannot stash file: The selected file is outside the current workspace.\n\nWorkspace: ${workspaceRoot}\nFile: ${filePath}`
             );
             return;
         }
@@ -766,23 +795,23 @@ export class DirectoryWorker
             }
 
             // Get file status
-            const status = await gitService.getFileStatus(uri.fsPath);
+            const status = await gitService.getFileStatus(filePath);
 
             if (!status.isModified && !status.isUntracked)
             {
-                vscode.window.showInformationMessage(`No changes to stash for '${path.basename(uri.fsPath)}'`);
+                vscode.window.showInformationMessage(`No changes to stash for '${path.basename(filePath)}'`);
                 return;
             }
 
             // Ask for stash message (optional)
             const stashMessage = await vscode.window.showInputBox({
-                prompt: `Enter stash message for '${path.basename(uri.fsPath)}' (optional)`,
+                prompt: `Enter stash message for '${path.basename(filePath)}' (optional)`,
                 placeHolder: 'WIP: temporary changes'
             });
 
             // Confirm stash action
             const confirmation = await vscode.window.showWarningMessage(
-                `Stash changes for '${path.basename(uri.fsPath)}'? This will save the changes and revert the file to the last commit.`,
+                `Stash changes for '${path.basename(filePath)}'? This will save the changes and revert the file to the last commit.`,
                 'Yes, Stash', 'Cancel'
             );
 
@@ -795,7 +824,7 @@ export class DirectoryWorker
                 cancellable: false
             }, async () =>
             {
-                const result = await gitService.stashFile(uri.fsPath, stashMessage || undefined);
+                const result = await gitService.stashFile(filePath, stashMessage || undefined);
 
                 if (result.success)
                 {
@@ -811,6 +840,407 @@ export class DirectoryWorker
         {
             console.error('Git stash failed:', error);
             vscode.window.showErrorMessage(`Failed to stash file: ${error}`);
+        }
+    }
+
+    public async gitPushBookmarkedFiles(): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git push requires a workspace.');
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Collect all bookmarked files
+            const bookmarkedFiles: string[] = [];
+            const skippedFiles: string[] = [];
+
+            console.log('Git Push - Workspace root:', workspaceRoot);
+            console.log('Git Push - Total bookmarked files:', this.bookmarkSections.reduce((sum, s) => sum + s.directories.length, 0));
+
+            for (const section of this.bookmarkSections)
+            {
+                for (const dir of section.directories)
+                {
+                    // If the path is already absolute, use it; otherwise resolve it relative to workspace
+                    const absolutePath = path.isAbsolute(dir.path) 
+                        ? dir.path 
+                        : path.join(workspaceRoot, dir.path);
+
+                    // Normalize paths for comparison
+                    const normalizedWorkspace = path.resolve(workspaceRoot);
+                    const normalizedPath = path.resolve(absolutePath);
+                    const relativePath = path.relative(normalizedWorkspace, normalizedPath);
+
+                    console.log('Checking file:', {
+                        fileName: path.basename(dir.path),
+                        originalPath: dir.path,
+                        absolutePath: absolutePath,
+                        relativePath: relativePath,
+                        startsWithDotDot: relativePath.startsWith('..'),
+                        isAbsolute: path.isAbsolute(relativePath)
+                    });
+
+                    // Only include files that are within the workspace
+                    if (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
+                    {
+                        bookmarkedFiles.push(absolutePath);
+                    }
+                    else
+                    {
+                        skippedFiles.push(path.basename(dir.path));
+                    }
+                }
+            }
+
+            console.log('Files to push:', bookmarkedFiles.length);
+            console.log('Files skipped:', skippedFiles.length);
+
+            if (bookmarkedFiles.length === 0)
+            {
+                if (skippedFiles.length > 0)
+                {
+                    vscode.window.showWarningMessage(
+                        `No bookmarked files within the workspace to push.\n\n${skippedFiles.length} file(s) were skipped because they are outside the workspace:\n${skippedFiles.slice(0, 5).join(', ')}${skippedFiles.length > 5 ? '...' : ''}`
+                    );
+                }
+                else
+                {
+                    vscode.window.showInformationMessage('No bookmarked files to push.');
+                }
+                return;
+            }
+
+            // Ask for commit message
+            const commitMessage = await vscode.window.showInputBox({
+                prompt: `Enter commit message for ${bookmarkedFiles.length} bookmarked file(s)`,
+                placeHolder: 'feat: update bookmarked files',
+                validateInput: (value) =>
+                {
+                    if (!value || value.trim().length === 0)
+                    {
+                        return 'Commit message cannot be empty';
+                    }
+                    return null;
+                }
+            });
+
+            if (!commitMessage) return;
+
+            // Stage, commit, and push all bookmarked files
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Pushing bookmarked files...",
+                cancellable: false
+            }, async () =>
+            {
+                const result = await gitService.stageCommitAndPushFiles(bookmarkedFiles, commitMessage);
+
+                if (result.success)
+                {
+                    vscode.window.showInformationMessage(result.message);
+                }
+                else
+                {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git push bookmarked files failed:', error);
+            vscode.window.showErrorMessage(`Failed to push bookmarked files: ${error}`);
+        }
+    }
+
+    public async gitFetch(): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git fetch requires a workspace.');
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Fetch from remote
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Fetching from remote...",
+                cancellable: false
+            }, async () =>
+            {
+                const success = await gitService.fetch();
+
+                if (success)
+                {
+                    vscode.window.showInformationMessage('Successfully fetched from remote');
+                }
+                else
+                {
+                    vscode.window.showErrorMessage('Failed to fetch from remote');
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git fetch failed:', error);
+            vscode.window.showErrorMessage(`Failed to fetch: ${error}`);
+        }
+    }
+
+    public async gitPull(): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git pull requires a workspace.');
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Check for uncommitted changes
+            const status = await gitService.getGitInfo();
+            if (status.hasLocalChanges)
+            {
+                const action = await vscode.window.showWarningMessage(
+                    'You have uncommitted changes. What would you like to do?',
+                    'Stash and Pull', 'Cancel'
+                );
+
+                if (action !== 'Stash and Pull')
+                {
+                    return;
+                }
+
+                // Stash changes
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: "Stashing changes...",
+                    cancellable: false
+                }, async () =>
+                {
+                    await gitService.stashChanges('Auto-stash before pull');
+                });
+            }
+
+            // Pull from remote
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Pulling from remote...",
+                cancellable: false
+            }, async () =>
+            {
+                const success = await gitService.pull();
+
+                if (success)
+                {
+                    vscode.window.showInformationMessage('Successfully pulled from remote');
+                }
+                else
+                {
+                    vscode.window.showErrorMessage('Failed to pull from remote. You may need to resolve conflicts.');
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git pull failed:', error);
+            vscode.window.showErrorMessage(`Failed to pull: ${error}`);
+        }
+    }
+
+    public async gitRebase(): Promise<void>
+    {
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
+        {
+            vscode.window.showErrorMessage('No workspace detected. Git rebase requires a workspace.');
+            return;
+        }
+
+        try
+        {
+            const gitService = new GitService(workspaceRoot);
+
+            // Check if git repository
+            try
+            {
+                await gitService.getCurrentBranch();
+            } catch (error)
+            {
+                vscode.window.showErrorMessage('This workspace is not a Git repository.');
+                return;
+            }
+
+            // Get list of branches
+            const branches = await gitService.getAllBranches();
+            const branchNames = branches
+                .filter(b => !b.remote)
+                .map(b => b.name);
+
+            if (branchNames.length === 0)
+            {
+                vscode.window.showErrorMessage('No branches found.');
+                return;
+            }
+
+            // Ask user to select a branch to rebase onto
+            const targetBranch = await vscode.window.showQuickPick(branchNames, {
+                placeHolder: 'Select branch to rebase onto',
+                canPickMany: false
+            });
+
+            if (!targetBranch)
+            {
+                return;
+            }
+
+            // Check for uncommitted changes
+            const status = await gitService.getGitInfo();
+            if (status.hasLocalChanges)
+            {
+                vscode.window.showWarningMessage(
+                    'You have uncommitted changes. Please commit or stash them before rebasing.'
+                );
+                return;
+            }
+
+            // Confirm rebase
+            const confirmation = await vscode.window.showWarningMessage(
+                `Rebase current branch onto '${targetBranch}'? This will rewrite commit history.`,
+                'Yes, Rebase', 'Cancel'
+            );
+
+            if (confirmation !== 'Yes, Rebase')
+            {
+                return;
+            }
+
+            // Perform rebase
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Rebasing onto ${targetBranch}...`,
+                cancellable: false
+            }, async () =>
+            {
+                const result = await gitService.rebase(targetBranch);
+
+                if (result.success)
+                {
+                    vscode.window.showInformationMessage(result.message);
+                }
+                else
+                {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error)
+        {
+            console.error('Git rebase failed:', error);
+            vscode.window.showErrorMessage(`Failed to rebase: ${error}`);
+        }
+    }
+
+    public async gitOperations(): Promise<void>
+    {
+        const operations = [
+            {
+                label: '$(cloud-upload) Push All Bookmarked Files',
+                description: 'Stage, commit, and push all bookmarked files',
+                action: 'push'
+            },
+            {
+                label: '$(cloud-download) Fetch',
+                description: 'Fetch changes from remote',
+                action: 'fetch'
+            },
+            {
+                label: '$(repo-pull) Pull',
+                description: 'Pull and merge changes from remote',
+                action: 'pull'
+            },
+            {
+                label: '$(git-merge) Rebase',
+                description: 'Rebase current branch onto another',
+                action: 'rebase'
+            }
+        ];
+
+        const selected = await vscode.window.showQuickPick(operations, {
+            placeHolder: 'Select a git operation'
+        });
+
+        if (!selected) return;
+
+        switch (selected.action)
+        {
+            case 'push':
+                await this.gitPushBookmarkedFiles();
+                break;
+            case 'fetch':
+                await this.gitFetch();
+                break;
+            case 'pull':
+                await this.gitPull();
+                break;
+            case 'rebase':
+                await this.gitRebase();
+                break;
         }
     }
 
@@ -1890,7 +2320,7 @@ Keep the summary focused and easy to understand.`;
             return;
         }
 
-        await this.presentDiffOptions(diff, path.basename(absolutePath), 'Working Directory vs HEAD', absolutePath);
+        await this.presentDiffOptions(diff, path.basename(absolutePath), 'Working Directory vs HEAD', absolutePath, 'working');
     }
 
     private async showRemoteDiff(gitService: GitService, absolutePath: string, currentBranch: string): Promise<void>
@@ -1904,7 +2334,7 @@ Keep the summary focused and easy to understand.`;
             return;
         }
 
-        await this.presentDiffOptions(diff, path.basename(absolutePath), `Local vs ${remoteBranch}`, absolutePath);
+        await this.presentDiffOptions(diff, path.basename(absolutePath), `Local vs ${remoteBranch}`, absolutePath, 'remote', remoteBranch);
     }
 
     private async showBranchDiff(gitService: GitService, absolutePath: string): Promise<void>
@@ -1978,45 +2408,106 @@ Keep the summary focused and easy to understand.`;
         await this.presentDiffOptions(diff, path.basename(absolutePath), `Current vs ${selectedCommit.commit.hash.substring(0, 8)}`, absolutePath);
     }
 
-    private async presentDiffOptions(diff: string, fileName: string, compareInfo: string, absolutePath?: string): Promise<void>
+    private async presentDiffOptions(diff: string, fileName: string, compareInfo: string, absolutePath?: string, diffType?: string, remoteBranch?: string): Promise<void>
     {
+        // First, show the side-by-side diff by default if available
+        if (absolutePath)
+        {
+            await this.showSideBySideDiff(absolutePath, compareInfo, diffType, remoteBranch);
+        }
+        else
+        {
+            // Fallback to text diff if no path available
+            await this.showDiffInEditor(diff, fileName, compareInfo);
+        }
+
+        // Then offer additional options
         const action = await vscode.window.showInformationMessage(
-            `Git diff found: ${compareInfo}`,
-            'View Diff', 'AI Summarize Diff', 'Open Side-by-Side', 'Cancel'
+            `Git diff: ${compareInfo}`,
+            'View Raw Diff', 'AI Summarize Diff', 'Close'
         );
 
         switch (action)
         {
-            case 'View Diff':
+            case 'View Raw Diff':
                 await this.showDiffInEditor(diff, fileName, compareInfo);
                 break;
             case 'AI Summarize Diff':
                 await this.generateAIDiffSummary(diff, fileName, compareInfo);
                 break;
-            case 'Open Side-by-Side':
-                if (absolutePath)
-                {
-                    await this.showSideBySideDiff(absolutePath, compareInfo);
-                } else
-                {
-                    vscode.window.showErrorMessage('Cannot open side-by-side diff: file path not available');
-                }
-                break;
         }
     }
 
-    private async showSideBySideDiff(absolutePath: string, compareInfo: string): Promise<void>
+    private async showSideBySideDiff(absolutePath: string, compareInfo: string, diffType?: string, remoteBranch?: string): Promise<void>
     {
-        // Use VS Code's built-in diff viewer
-        const fileUri = vscode.Uri.file(absolutePath);
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
 
-        // For side-by-side diff, we'll use VS Code's built-in git diff
+        if (!workspaceRoot) 
+        {
+            vscode.window.showErrorMessage('No workspace found for diff comparison.');
+            return;
+        }
+
         try
         {
-            await vscode.commands.executeCommand('git.openChange', fileUri);
+            const relativePath = path.relative(workspaceRoot, absolutePath);
+            const normalizedPath = relativePath.replace(/\\/g, '/');
+            
+            // Determine which version to compare against
+            let compareRef = 'HEAD';
+            let compareLabel = 'HEAD';
+            
+            if (diffType === 'remote' && remoteBranch)
+            {
+                compareRef = remoteBranch;
+                compareLabel = remoteBranch;
+            }
+            
+            // Get comparison content using simple-git
+            const git = simpleGit(workspaceRoot);
+            const compareContent = await git.show([`${compareRef}:${normalizedPath}`]);
+            
+            // Use a scheme-based URI that won't persist
+            const compareUri = vscode.Uri.parse(`git-diff:${path.basename(absolutePath)} (${compareLabel}).${path.extname(absolutePath)}`).with({
+                scheme: 'git-diff',
+                query: Buffer.from(compareContent).toString('base64')
+            });
+            
+            // Register a content provider for our custom scheme
+            const disposable = vscode.workspace.registerTextDocumentContentProvider('git-diff', {
+                provideTextDocumentContent(uri: vscode.Uri): string {
+                    return Buffer.from(uri.query, 'base64').toString('utf-8');
+                }
+            });
+            
+            // Open current file
+            const currentUri = vscode.Uri.file(absolutePath);
+            
+            // Open diff editor
+            await vscode.commands.executeCommand(
+                'vscode.diff',
+                compareUri,
+                currentUri,
+                `${path.basename(absolutePath)} (${compareLabel} ↔ Working Tree)`
+            );
+            
+            // Dispose the provider after a delay to allow the diff to open
+            setTimeout(() => disposable.dispose(), 1000);
         } catch (error)
         {
-            vscode.window.showErrorMessage('Could not open side-by-side diff. Please ensure the Git extension is active.');
+            console.error('Side-by-side diff failed:', error);
+            
+            // Try alternative: just open the file with git extension
+            try
+            {
+                const fileUri = vscode.Uri.file(absolutePath);
+                await vscode.commands.executeCommand('git.openChange', fileUri);
+            } catch (altError)
+            {
+                vscode.window.showErrorMessage(`Could not open diff view: ${error}`);
+            }
         }
     }
 
