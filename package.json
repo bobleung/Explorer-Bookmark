@@ -8,7 +8,7 @@
   "displayName": "Quick Bookmark",
   "description": "Quickly access important folders and files. Forked from Explorer Bookmark by UrosVujosevic.",
   "icon": "docs/icon.png",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "engines": {
     "vscode": "^1.66.0"
   },
@@ -67,10 +67,20 @@
       {
         "command": "directoryprovider/cantremoveitem",
         "title": "Remove from Quick Bookmark"
+      },
+      {
+        "command": "directoryprovider/togglereorder",
+        "title": "Toggle Reorder Mode",
+        "icon": "$(list-ordered)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "directoryprovider/togglereorder",
+          "when": "view == explorer-bookmark",
+          "group": "navigation"
+        },
         {
           "command": "directoryprovider/refreshentry",
           "when": "view == explorer-bookmark",

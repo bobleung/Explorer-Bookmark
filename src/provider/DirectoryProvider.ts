@@ -7,8 +7,8 @@ export class DirectoryProvider
     vscode.TreeDataProvider<FileSystemObject>,
     vscode.TreeDragAndDropController<FileSystemObject>
 {
-  dropMimeTypes = ["application/vnd.code.tree.explorerbookmark"];
-  dragMimeTypes = ["application/vnd.code.tree.explorerbookmark"];
+  dropMimeTypes = ["application/vnd.code.tree.explorer-bookmark"];
+  dragMimeTypes = ["application/vnd.code.tree.explorer-bookmark"];
   private _onDidChangeTreeData: vscode.EventEmitter<
     FileSystemObject | undefined | null | void
   > = new vscode.EventEmitter<FileSystemObject | undefined | null | void>();
@@ -16,6 +16,8 @@ export class DirectoryProvider
   readonly onDidChangeTreeData: vscode.Event<
     FileSystemObject | undefined | null | void
   > = this._onDidChangeTreeData.event;
+
+  private isReorderMode: boolean = false;
 
   constructor(
     private directoryOperator: DirectoryWorker,
@@ -31,7 +33,7 @@ export class DirectoryProvider
 
   async getChildren(element?: FileSystemObject): Promise<FileSystemObject[]>
   {
-    return await this.directoryOperator.getChildren(element);
+    return await this.directoryOperator.getChildren(element, this.isReorderMode);
   }
 
   async selectItem(uri: vscode.Uri | undefined)
@@ -57,12 +59,21 @@ export class DirectoryProvider
     this._onDidChangeTreeData.fire();
   }
 
+  toggleReorderMode(): void
+  {
+    this.isReorderMode = !this.isReorderMode;
+    this.refresh();
+  }
+
   async handleDrag(
     source: readonly FileSystemObject[],
     dataTransfer: vscode.DataTransfer,
     _token: vscode.CancellationToken
   ): Promise<void>
   {
+    // Allow drag to start so VS Code shows hover highlighting
+    // (drop will be rejected in handleDrop if not in reorder mode)
+
     // Only allow dragging directly bookmarked items
     const directlyBookmarked = source.filter(
       (item) => item.contextValue === "directlyBookmarkedDirectory"
@@ -71,7 +82,7 @@ export class DirectoryProvider
     if (directlyBookmarked.length > 0)
     {
       dataTransfer.set(
-        "application/vnd.code.tree.explorerbookmark",
+        "application/vnd.code.tree.explorer-bookmark",
         new vscode.DataTransferItem(directlyBookmarked[0].resourceUri.fsPath)
       );
     }
@@ -83,8 +94,14 @@ export class DirectoryProvider
     _token: vscode.CancellationToken
   ): Promise<void>
   {
+    // Only allow dropping when in reorder mode
+    if (!this.isReorderMode)
+    {
+      return;
+    }
+
     const transferItem = dataTransfer.get(
-      "application/vnd.code.tree.explorerbookmark"
+      "application/vnd.code.tree.explorer-bookmark"
     );
 
     if (!transferItem)
@@ -108,8 +125,8 @@ export class DirectoryProvider
 
     const targetPath = target.resourceUri.fsPath;
 
-    // Reorder: insert before the target
-    this.directoryOperator.reorderBookmark(sourcePath, targetPath, true);
+    // Reorder: insert after the target
+    this.directoryOperator.reorderBookmark(sourcePath, targetPath, false);
     this.refresh();
   }
 }

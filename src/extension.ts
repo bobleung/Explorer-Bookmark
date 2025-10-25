@@ -62,6 +62,10 @@ export function activate(context: vscode.ExtensionContext)
         DirectoryProviderCommands.RemoveAllItems,
         () => directoryProvider.removeAllItems()
       ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.ToggleReorder,
+        () => directoryProvider.toggleReorderMode()
+      ),
     ]
   );
 }

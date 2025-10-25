@@ -22,15 +22,20 @@ export class DirectoryWorker
         this.hydrateState();
     }
 
-    public async getChildren(element?: FileSystemObject): Promise<FileSystemObject[]>
+    public async getChildren(element?: FileSystemObject, isReorderMode: boolean = false): Promise<FileSystemObject[]>
     {
         if (element)
         {
+            // In reorder mode, don't show nested children
+            if (isReorderMode)
+            {
+                return Promise.resolve([]);
+            }
             return this.directorySearch(element.resourceUri);
         } else
         {
             return this.bookmarkedDirectories.length > 0
-                ? this.createEntries(this.bookmarkedDirectories)
+                ? this.createEntries(this.bookmarkedDirectories, isReorderMode)
                 : Promise.resolve([]);
         }
     }
@@ -114,7 +119,7 @@ export class DirectoryWorker
             });
     }
 
-    private async createEntries(bookmarkedDirectories: TypedDirectory[])
+    private async createEntries(bookmarkedDirectories: TypedDirectory[], isReorderMode: boolean = false)
     {
         let fileSystem: FileSystemObject[] = [];
 
@@ -123,12 +128,21 @@ export class DirectoryWorker
             const { path: filePath, type: type } = dir;
             const file = vscode.Uri.file(filePath);
 
+            // In reorder mode, add drag handle and collapse all
+            const label = isReorderMode
+                ? `≡ ${path.basename(dir.path)}`
+                : path.basename(dir.path);
+
+            const collapsibleState = isReorderMode
+                ? vscode.TreeItemCollapsibleState.None
+                : (type === vscode.FileType.File
+                    ? vscode.TreeItemCollapsibleState.None
+                    : vscode.TreeItemCollapsibleState.Collapsed);
+
             fileSystem.push(
                 new FileSystemObject(
-                    `${path.basename(dir.path)}`,
-                    type === vscode.FileType.File
-                        ? vscode.TreeItemCollapsibleState.None
-                        : vscode.TreeItemCollapsibleState.Collapsed,
+                    label,
+                    collapsibleState,
                     file
                 ).setContextValue(this.bookmarkedDirectoryContextValue)
             );
