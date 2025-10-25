@@ -74,6 +74,7 @@ All commands are defined in [src/commands/CrudCommands.ts](src/commands/CrudComm
 - `directoryprovider/removeallitems` - Clear all bookmarks
 - `directoryprovider/refreshentry` - Refresh tree view
 - `directoryprovider/openitem` - Open file in editor (automatically triggered on file click)
+- `directoryprovider/togglereorder` - Toggle reorder mode for drag-and-drop reordering
 
 ### State Persistence
 
@@ -91,17 +92,47 @@ Single configuration setting defined in [package.json](package.json):
 ### Tree View Integration
 
 The extension contributes to the built-in Explorer view sidebar:
+
 - View ID: `explorer-bookmark`
 - Display name: "Explorer Bookmark"
 - Context menu in Explorer: "Add to Explorer Bookmark" command
-- View toolbar: Refresh and Remove All Items buttons
+- View toolbar: Toggle Reorder Mode, Refresh, and Remove All Items buttons
 - Item context menu: Remove button (inline) for directly bookmarked items only
+
+### Drag and Drop / Reorder Mode
+
+The extension implements `vscode.TreeDragAndDropController` for reordering bookmarks:
+
+**Reorder Mode Toggle:**
+- Toolbar button toggles reorder mode on/off
+- Private `isReorderMode` state in DirectoryProvider tracks mode
+- Affects rendering and drag-and-drop availability
+
+**Reorder Mode Behaviour:**
+- All folders collapse and cannot be expanded (`getChildren()` returns empty array for nested items)
+- Items display with visual indicators: `⇅ 📁 foldername` for folders, `⇅ filename` for files
+- Collapse arrows and theme icons hidden (via `collapsibleState.None` and `iconPath = ThemeIcon('blank')`)
+- Drag-and-drop enabled only in reorder mode (checked in `handleDrag` and `handleDrop`)
+
+**Drag and Drop Implementation:**
+- MIME type: `application/vnd.code.tree.explorer-bookmark` (matches view ID)
+- Drop behaviour: Insert AFTER the target item (`dropBefore: false`)
+- `handleDrag()` always allows drag to start (for hover highlighting to work)
+- `handleDrop()` rejects drops when not in reorder mode
+- Hover highlighting: VS Code's built-in `list.dropBackground` provides visual feedback
+
+**Key Learnings:**
+- DO NOT return early from `handleDrag()` if you want hover highlighting - let the drag start, then reject in `handleDrop()`
+- To preserve folder/file icons in normal mode: don't set `iconPath`, let VS Code use `resourceUri` + `collapsibleState`
+- To hide icons in reorder mode: set `collapsibleState.None` + `iconPath = ThemeIcon('blank')`
+- Icon gap spacing is controlled by VS Code's tree view and cannot be removed via extension API
 
 ## Important Implementation Notes
 
 - File system operations use `vscode.workspace.fs` API (async), not Node.js `fs` module
 - URIs are always file URIs created with `vscode.Uri.file()` or `vscode.Uri.parse()`
 - Tree items are sorted alphabetically by name in `directorySearch()`
-- Directories are collapsible, files are not (determined by `vscode.FileType`)
+- Directories are collapsible in normal mode, all items are non-collapsible in reorder mode
 - The extension only activates on command execution (see `activationEvents` in package.json)
 - Context value `directlyBookmarkedDirectory` distinguishes user-added items from their nested children for menu visibility
+- Set `resourceUri` on TreeItem for proper icon theme integration
