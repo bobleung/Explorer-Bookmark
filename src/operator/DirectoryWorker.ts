@@ -22,12 +22,12 @@ export class DirectoryWorker
         this.hydrateState();
     }
 
-    public async getChildren(element?: FileSystemObject, isReorderMode: boolean = false): Promise<FileSystemObject[]>
+    public async getChildren(element?: FileSystemObject, isEditMode: boolean = false): Promise<FileSystemObject[]>
     {
         if (element)
         {
-            // In reorder mode, don't show nested children
-            if (isReorderMode)
+            // In edit mode, don't show nested children
+            if (isEditMode)
             {
                 return Promise.resolve([]);
             }
@@ -35,7 +35,7 @@ export class DirectoryWorker
         } else
         {
             return this.bookmarkedDirectories.length > 0
-                ? this.createEntries(this.bookmarkedDirectories, isReorderMode)
+                ? this.createEntries(this.bookmarkedDirectories, isEditMode)
                 : Promise.resolve([]);
         }
     }
@@ -119,7 +119,7 @@ export class DirectoryWorker
             });
     }
 
-    private async createEntries(bookmarkedDirectories: TypedDirectory[], isReorderMode: boolean = false)
+    private async createEntries(bookmarkedDirectories: TypedDirectory[], isEditMode: boolean = false)
     {
         let fileSystem: FileSystemObject[] = [];
 
@@ -128,17 +128,17 @@ export class DirectoryWorker
             const { path: filePath, type: type } = dir;
             const file = vscode.Uri.file(filePath);
 
-            // In reorder mode, set all items to None to remove collapse arrows and theme icons
+            // In edit mode, set all items to None to remove collapse arrows and theme icons
             // In normal mode, use proper collapsibleState for folder/file icons
-            const collapsibleState = isReorderMode
+            const collapsibleState = isEditMode
                 ? vscode.TreeItemCollapsibleState.None
                 : (type === vscode.FileType.File
                     ? vscode.TreeItemCollapsibleState.None
                     : vscode.TreeItemCollapsibleState.Collapsed);
 
-            // In reorder mode, add drag indicator and folder icon before filename
+            // In edit mode, add drag indicator and folder icon before filename
             let label = path.basename(dir.path);
-            if (isReorderMode)
+            if (isEditMode)
             {
                 const icon = type === vscode.FileType.Directory ? '📁' : '';
                 label = `⇅ ${icon}${icon ? ' ' : ''}${label}`;
@@ -150,8 +150,8 @@ export class DirectoryWorker
                 file
             ).setContextValue(this.bookmarkedDirectoryContextValue);
 
-            // In reorder mode, hide all theme icons by using transparent ThemeIcon
-            if (isReorderMode)
+            // In edit mode, hide all theme icons by using transparent ThemeIcon
+            if (isEditMode)
             {
                 item.iconPath = new vscode.ThemeIcon('blank');
             }

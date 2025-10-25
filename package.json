@@ -65,12 +65,12 @@
       },
       {
         "command": "directoryprovider/togglereorder",
-        "title": "Toggle Reorder Mode",
+        "title": "Toggle Edit Mode",
         "icon": "$(edit)"
       },
       {
         "command": "directoryprovider/exitreorder",
-        "title": "Exit Reorder Mode",
+        "title": "Exit Edit Mode",
         "icon": "$(pass-filled)"
       }
     ],
@@ -78,12 +78,12 @@
       "view/title": [
         {
           "command": "directoryprovider/togglereorder",
-          "when": "view == explorer-bookmark && !explorer-bookmark.isReorderMode",
+          "when": "view == explorer-bookmark && !explorer-bookmark.isEditMode",
           "group": "navigation@1"
         },
         {
           "command": "directoryprovider/exitreorder",
-          "when": "view == explorer-bookmark && explorer-bookmark.isReorderMode",
+          "when": "view == explorer-bookmark && explorer-bookmark.isEditMode",
           "group": "navigation@1"
         },
         {
@@ -100,16 +100,16 @@
       "view/item/context": [
         {
           "command": "directoryprovider/removeitem",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory"
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory && explorer-bookmark.isEditMode"
         },
         {
           "command": "directoryprovider/removeitem",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
+          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory && explorer-bookmark.isEditMode",
           "group": "inline"
         },
         {
           "command": "directoryprovider/cantremoveitem",
-          "when": "view == explorer-bookmark && viewItem != directlyBookmarkedDirectory"
+          "when": "view == explorer-bookmark && viewItem != directlyBookmarkedDirectory && explorer-bookmark.isEditMode"
         }
       ]
     },

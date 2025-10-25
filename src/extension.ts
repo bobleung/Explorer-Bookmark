@@ -6,8 +6,8 @@ import { vsCodeCommands } from "./commands/CrudCommands";
 
 export function activate(context: vscode.ExtensionContext)
 {
-  // Set initial context state for reorder mode
-  vscode.commands.executeCommand('setContext', 'explorer-bookmark.isReorderMode', false);
+  // Set initial context state for edit mode
+  vscode.commands.executeCommand('setContext', 'explorer-bookmark.isEditMode', false);
 
   const directoryOperator = new DirectoryWorker(
     context,

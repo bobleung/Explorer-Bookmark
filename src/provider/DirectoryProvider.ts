@@ -17,7 +17,7 @@ export class DirectoryProvider
     FileSystemObject | undefined | null | void
   > = this._onDidChangeTreeData.event;
 
-  private isReorderMode: boolean = false;
+  private isEditMode: boolean = false;
 
   constructor(
     private directoryOperator: DirectoryWorker,
@@ -33,7 +33,7 @@ export class DirectoryProvider
 
   async getChildren(element?: FileSystemObject): Promise<FileSystemObject[]>
   {
-    return await this.directoryOperator.getChildren(element, this.isReorderMode);
+    return await this.directoryOperator.getChildren(element, this.isEditMode);
   }
 
   async selectItem(uri: vscode.Uri | undefined)
@@ -61,16 +61,10 @@ export class DirectoryProvider
 
   toggleReorderMode(): void
   {
-    this.isReorderMode = !this.isReorderMode;
+    this.isEditMode = !this.isEditMode;
 
     // Update context for when clause
-    vscode.commands.executeCommand('setContext', 'explorer-bookmark.isReorderMode', this.isReorderMode);
-
-    // Show toast message
-    const message = this.isReorderMode
-      ? 'Reorder mode enabled'
-      : 'Reorder mode disabled';
-    vscode.window.showInformationMessage(message);
+    vscode.commands.executeCommand('setContext', 'explorer-bookmark.isEditMode', this.isEditMode);
 
     this.refresh();
   }
@@ -104,8 +98,8 @@ export class DirectoryProvider
     _token: vscode.CancellationToken
   ): Promise<void>
   {
-    // Only allow dropping when in reorder mode
-    if (!this.isReorderMode)
+    // Only allow dropping when in edit mode
+    if (!this.isEditMode)
     {
       return;
     }
