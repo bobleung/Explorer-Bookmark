@@ -134,17 +134,16 @@ export class DirectoryWorker
                 ? vscode.TreeItemCollapsibleState.None
                 : vscode.TreeItemCollapsibleState.Collapsed;
 
+            // In reorder mode, add drag indicator before filename
+            const label = isReorderMode
+                ? `⇅ ${path.basename(dir.path)}`
+                : path.basename(dir.path);
+
             const item = new FileSystemObject(
-                path.basename(dir.path),
+                label,
                 collapsibleState,
                 file
             ).setContextValue(this.bookmarkedDirectoryContextValue);
-
-            // In reorder mode, add visual indicator
-            if (isReorderMode)
-            {
-                item.description = "⇅"; // up-down arrow to indicate draggable
-            }
 
             fileSystem.push(item);
         }
