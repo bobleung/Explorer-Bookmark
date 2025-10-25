@@ -128,24 +128,25 @@ export class DirectoryWorker
             const { path: filePath, type: type } = dir;
             const file = vscode.Uri.file(filePath);
 
-            // In reorder mode, add drag handle and collapse all
-            const label = isReorderMode
-                ? `≡ ${path.basename(dir.path)}`
-                : path.basename(dir.path);
-
-            const collapsibleState = isReorderMode
+            // Always use proper collapsibleState so VS Code shows correct folder/file icons
+            // In reorder mode, folders won't expand because getChildren() returns empty array
+            const collapsibleState = type === vscode.FileType.File
                 ? vscode.TreeItemCollapsibleState.None
-                : (type === vscode.FileType.File
-                    ? vscode.TreeItemCollapsibleState.None
-                    : vscode.TreeItemCollapsibleState.Collapsed);
+                : vscode.TreeItemCollapsibleState.Collapsed;
 
-            fileSystem.push(
-                new FileSystemObject(
-                    label,
-                    collapsibleState,
-                    file
-                ).setContextValue(this.bookmarkedDirectoryContextValue)
-            );
+            const item = new FileSystemObject(
+                path.basename(dir.path),
+                collapsibleState,
+                file
+            ).setContextValue(this.bookmarkedDirectoryContextValue);
+
+            // In reorder mode, add visual indicator
+            if (isReorderMode)
+            {
+                item.description = "⇅"; // up-down arrow to indicate draggable
+            }
+
+            fileSystem.push(item);
         }
 
         return fileSystem;
