@@ -128,11 +128,13 @@ export class DirectoryWorker
             const { path: filePath, type: type } = dir;
             const file = vscode.Uri.file(filePath);
 
-            // Always use proper collapsibleState so VS Code shows correct folder/file icons
-            // In reorder mode, folders won't expand because getChildren() returns empty array
-            const collapsibleState = type === vscode.FileType.File
+            // In reorder mode, set all items to None to remove collapse arrows and theme icons
+            // In normal mode, use proper collapsibleState for folder/file icons
+            const collapsibleState = isReorderMode
                 ? vscode.TreeItemCollapsibleState.None
-                : vscode.TreeItemCollapsibleState.Collapsed;
+                : (type === vscode.FileType.File
+                    ? vscode.TreeItemCollapsibleState.None
+                    : vscode.TreeItemCollapsibleState.Collapsed);
 
             // In reorder mode, add drag indicator and folder icon before filename
             let label = path.basename(dir.path);
@@ -147,6 +149,12 @@ export class DirectoryWorker
                 collapsibleState,
                 file
             ).setContextValue(this.bookmarkedDirectoryContextValue);
+
+            // In reorder mode, hide all theme icons by using transparent ThemeIcon
+            if (isReorderMode)
+            {
+                item.iconPath = new vscode.ThemeIcon('blank');
+            }
 
             fileSystem.push(item);
         }
