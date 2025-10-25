@@ -48,10 +48,10 @@ export class DirectoryWorker
     {
         if (uri)
         {
-            const typedDirectory = await buildTypedDirectory(uri)
+            const typedDirectory = await buildTypedDirectory(uri);
             const index =
                 this.bookmarkedDirectories.map(e => e.path)
-                    .indexOf(typedDirectory.path)
+                    .indexOf(typedDirectory.path);
             if (index > -1)
             {
                 this.bookmarkedDirectories.splice(index, 1);
@@ -63,6 +63,33 @@ export class DirectoryWorker
     public removeAllItems()
     {
         this.bookmarkedDirectories = [];
+        this.saveBookmarks();
+    }
+
+    public reorderBookmark(sourcePath: string, targetPath: string, dropBefore: boolean)
+    {
+        const sourceIndex = this.bookmarkedDirectories.findIndex(d => d.path === sourcePath);
+        const targetIndex = this.bookmarkedDirectories.findIndex(d => d.path === targetPath);
+
+        if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex)
+        {
+            return;
+        }
+
+        // Remove the source item
+        const [movedItem] = this.bookmarkedDirectories.splice(sourceIndex, 1);
+
+        // Calculate the new index after removal
+        let newTargetIndex = targetIndex;
+        if (sourceIndex < targetIndex)
+        {
+            newTargetIndex--;
+        }
+
+        // Insert before or after target
+        const insertIndex = dropBefore ? newTargetIndex : newTargetIndex + 1;
+        this.bookmarkedDirectories.splice(insertIndex, 0, movedItem);
+
         this.saveBookmarks();
     }
 

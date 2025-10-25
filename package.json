@@ -4,13 +4,13 @@
     "type": "git",
     "url": "https://github.com/UrosVuj/Explorer-Bookmark.git"
   },
-  "publisher": "UrosVujosevic",
-  "displayName": "Explorer Bookmark",
-  "description": "Quickly access important folders and files",
+  "publisher": "bobleung",
+  "displayName": "Quick Bookmark",
+  "description": "Quickly access important folders and files. Forked from Explorer Bookmark by UrosVujosevic.",
   "icon": "docs/icon.png",
   "version": "1.0.1",
   "engines": {
-    "vscode": "^1.55.0"
+    "vscode": "^1.66.0"
   },
   "categories": [
     "Other"
@@ -40,7 +40,7 @@
       "explorer": [
         {
           "id": "explorer-bookmark",
-          "name": "Explorer Bookmark"
+          "name": "Quick Bookmark"
         }
       ]
     },
@@ -52,11 +52,11 @@
       },
       {
         "command": "directoryprovider/selectitem",
-        "title": "Add to Explorer Bookmark"
+        "title": "Add to Quick Bookmark"
       },
       {
         "command": "directoryprovider/removeitem",
-        "title": "Remove from Explorer Bookmark",
+        "title": "Remove from Quick Bookmark",
         "icon": "$(close)"
       },
       {
@@ -66,7 +66,7 @@
       },
       {
         "command": "directoryprovider/cantremoveitem",
-        "title": "Remove from Explorer Bookmark"
+        "title": "Remove from Quick Bookmark"
       }
     ],
     "menus": {
@@ -104,7 +104,7 @@
       ]
     },
     "configuration": {
-      "title": "Explorer Bookmark",
+      "title": "Quick Bookmark",
       "properties": {
         "explorer-bookmark.saveWorkspace": {
           "type": "boolean",
@@ -126,7 +126,7 @@
     "@types/glob": "^7.2.0",
     "@types/mocha": "^8.2.3",
     "@types/node": "^12.20.55",
-    "@types/vscode": "^1.55.0",
+    "@types/vscode": "^1.66.0",
     "@typescript-eslint/eslint-plugin": "^4.33.0",
     "@typescript-eslint/parser": "^4.33.0",
     "eslint": "^7.32.0",

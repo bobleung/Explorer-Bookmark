@@ -15,9 +15,12 @@ export function activate(context: vscode.ExtensionContext)
     directoryOperator
   );
 
-  vscode.window.registerTreeDataProvider(
-    "explorer-bookmark",
-    directoryProvider);
+  const treeView = vscode.window.createTreeView("explorer-bookmark", {
+    treeDataProvider: directoryProvider,
+    dragAndDropController: directoryProvider,
+  });
+
+  context.subscriptions.push(treeView);
 
   context.subscriptions.push(
     ...[
