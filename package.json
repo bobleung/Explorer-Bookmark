@@ -60,36 +60,36 @@
         "icon": "$(close)"
       },
       {
-        "command": "directoryprovider/removeallitems",
-        "title": "Remove All Items",
-        "icon": "$(trash)"
-      },
-      {
         "command": "directoryprovider/cantremoveitem",
         "title": "Remove from Quick Bookmark"
       },
       {
         "command": "directoryprovider/togglereorder",
         "title": "Toggle Reorder Mode",
-        "icon": "$(list-ordered)"
+        "icon": "$(edit)"
+      },
+      {
+        "command": "directoryprovider/exitreorder",
+        "title": "Exit Reorder Mode",
+        "icon": "$(pass-filled)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "directoryprovider/togglereorder",
-          "when": "view == explorer-bookmark",
-          "group": "navigation"
+          "when": "view == explorer-bookmark && !explorer-bookmark.isReorderMode",
+          "group": "navigation@1"
+        },
+        {
+          "command": "directoryprovider/exitreorder",
+          "when": "view == explorer-bookmark && explorer-bookmark.isReorderMode",
+          "group": "navigation@1"
         },
         {
           "command": "directoryprovider/refreshentry",
           "when": "view == explorer-bookmark",
-          "group": "navigation"
-        },
-        {
-          "command": "directoryprovider/removeallitems",
-          "when": "view == explorer-bookmark",
-          "group": "navigation"
+          "group": "navigation@2"
         }
       ],
       "explorer/context": [

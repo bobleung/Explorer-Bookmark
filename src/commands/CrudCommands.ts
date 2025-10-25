@@ -12,4 +12,5 @@ export enum DirectoryProviderCommands
     RemoveItem = 'directoryprovider/removeitem',
     RemoveAllItems = 'directoryprovider/removeallitems',
     ToggleReorder = 'directoryprovider/togglereorder',
+    ExitReorder = 'directoryprovider/exitreorder',
 };

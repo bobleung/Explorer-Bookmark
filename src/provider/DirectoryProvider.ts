@@ -62,6 +62,16 @@ export class DirectoryProvider
   toggleReorderMode(): void
   {
     this.isReorderMode = !this.isReorderMode;
+
+    // Update context for when clause
+    vscode.commands.executeCommand('setContext', 'explorer-bookmark.isReorderMode', this.isReorderMode);
+
+    // Show toast message
+    const message = this.isReorderMode
+      ? 'Reorder mode enabled'
+      : 'Reorder mode disabled';
+    vscode.window.showInformationMessage(message);
+
     this.refresh();
   }
 

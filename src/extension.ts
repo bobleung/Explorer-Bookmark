@@ -6,6 +6,9 @@ import { vsCodeCommands } from "./commands/CrudCommands";
 
 export function activate(context: vscode.ExtensionContext)
 {
+  // Set initial context state for reorder mode
+  vscode.commands.executeCommand('setContext', 'explorer-bookmark.isReorderMode', false);
+
   const directoryOperator = new DirectoryWorker(
     context,
     vscode.workspace.workspaceFolders
@@ -64,6 +67,10 @@ export function activate(context: vscode.ExtensionContext)
       ),
       vscode.commands.registerCommand(
         DirectoryProviderCommands.ToggleReorder,
+        () => directoryProvider.toggleReorderMode()
+      ),
+      vscode.commands.registerCommand(
+        DirectoryProviderCommands.ExitReorder,
         () => directoryProvider.toggleReorderMode()
       ),
     ]
