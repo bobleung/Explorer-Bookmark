@@ -7,11 +7,9 @@ import { BookmarkSection } from "../types/BookmarkSection";
 import { AIService } from "../services/AIService";
 import { TeamBookmarkService } from "../services/TeamBookmarkService";
 import { GitService } from "../services/GitService";
-import { GitHubService } from "../services/GitHubService";
-import { CommentService } from "../services/CommentService";
 const simpleGit = require('simple-git');
 
-export class DirectoryWorker 
+export class DirectoryWorker
 {
     readonly vsCodeExtensionConfigurationKey: string = "explorer-bookmark";
     readonly saveWorkspaceConfigurationSettingKey: string = "saveWorkspace";
@@ -42,7 +40,7 @@ export class DirectoryWorker
             }
             return [];
         }
-        else if (element && element.sectionId) 
+        else if (element && element.sectionId)
         {
             return this.directorySearch(element.resourceUri);
         }
@@ -78,7 +76,6 @@ export class DirectoryWorker
                 ? this.workspaceRoot[0].uri.fsPath
                 : undefined;
 
-            // TODO: proveri da li radi kako treba
             if (workspaceRoot)
             {
                 const relativePath = path.relative(workspaceRoot, uri.fsPath);
@@ -97,39 +94,33 @@ export class DirectoryWorker
             }
 
             const currentUser = await this.getCurrentUser();
-            const typedDirectory = await buildTypedDirectory(uri, undefined, undefined, currentUser);
+            const typedDirectory = await buildTypedDirectory(uri, undefined, currentUser);
 
-            // convert to relative path for storage if we have a workspace root
             if (workspaceRoot && path.isAbsolute(typedDirectory.path))
             {
-                // store as relative path
                 const relativePath = path.relative(workspaceRoot, typedDirectory.path);
                 typedDirectory.path = relativePath;
             }
 
-            // if no section specified, use default or ask user
             let targetSectionId = sectionId;
             if (!targetSectionId)
             {
                 if (this.bookmarkSections.length === 0)
                 {
-                    // create default section if none exist
                     const defaultSection = BookmarkSection.createDefault();
                     this.bookmarkSections.push(defaultSection);
                     targetSectionId = defaultSection.id;
                 }
                 else if (this.bookmarkSections.length === 1)
                 {
-                    // use the only section
                     targetSectionId = this.bookmarkSections[0].id;
                 }
                 else
                 {
-                    // ask user to select section
                     targetSectionId = await this.askUserForSection();
                     if (!targetSectionId)
                     {
-                        return; // user cancelled
+                        return;
                     }
                 }
             }
@@ -153,11 +144,9 @@ export class DirectoryWorker
 
             if (sectionId)
             {
-                // remove from specific section
                 const section = this.bookmarkSections.find(s => s.id === sectionId);
                 if (section)
                 {
-                    // find the relative path to remove
                     let pathToRemove = uri.fsPath;
                     if (workspaceRoot && path.isAbsolute(pathToRemove))
                     {
@@ -167,10 +156,8 @@ export class DirectoryWorker
                 }
             } else
             {
-                // remove from all sections
                 for (const section of this.bookmarkSections)
                 {
-                    // find the relative path to remove
                     let pathToRemove = uri.fsPath;
                     if (workspaceRoot && path.isAbsolute(pathToRemove))
                     {
@@ -209,91 +196,76 @@ export class DirectoryWorker
 
     public async generateAISummary(uri: vscode.Uri): Promise<void>
     {
-        try
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating AI summary...",
+            cancellable: false
+        }, async () =>
         {
-            vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Generating AI summary...",
-                cancellable: false
-            }, async () =>
+            const summary = await AIService.generateFileSummary(uri);
+
+            for (const section of this.bookmarkSections)
             {
-                const summary = await AIService.generateFileSummary(uri);
-
-                // find and update the bookmark
-                for (const section of this.bookmarkSections)
+                const bookmark = section.directories.find(d => d.path === uri.fsPath);
+                if (bookmark)
                 {
-                    const bookmark = section.directories.find(d => d.path === uri.fsPath);
-                    if (bookmark)
-                    {
-                        bookmark.updateAISummary(summary);
-                        this.saveSections();
-                        break;
-                    }
+                    bookmark.updateAISummary(summary);
+                    this.saveSections();
+                    break;
                 }
+            }
 
-                // open summary in a new tab to the side
-                const doc = await vscode.workspace.openTextDocument({
-                    content: summary,
-                    language: 'markdown'
-                });
-                await vscode.window.showTextDocument(doc, {
-                    viewColumn: vscode.ViewColumn.Beside,
-                    preview: false // ensure it opens as a permanent tab
-                });
+            const doc = await vscode.workspace.openTextDocument({
+                content: summary,
+                language: 'markdown'
             });
-        } catch (error)
-        {
-            console.error('Error generating AI summary:', error);
-            vscode.window.showErrorMessage('Failed to generate AI summary');
-        }
+            await vscode.window.showTextDocument(doc, {
+                viewColumn: vscode.ViewColumn.Beside,
+                preview: false
+            });
+        });
     }
 
     public async viewAISummary(uri: vscode.Uri): Promise<void>
     {
-        try
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating AI summary...",
+            cancellable: false
+        }, async () =>
         {
-            // always generate a fresh summary and open in new tab
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Generating AI summary...",
-                cancellable: false
-            }, async () =>
+            const summary = await AIService.generateFileSummary(uri);
+
+            const result = this.findBookmarkOrParentByUri(uri);
+            if (result)
             {
-                const summary = await AIService.generateFileSummary(uri);
+                result.bookmark.updateAISummary(summary);
+                this.saveSections();
+            }
 
-                // find and update the bookmark with the new summary
-                const result = this.findBookmarkOrParentByUri(uri);
-                if (result)
+            const filename = path.basename(uri.fsPath);
+            const panel = vscode.window.createWebviewPanel(
+                'aiSummary',
+                `AI Summary - ${filename}`,
+                vscode.ViewColumn.Beside,
                 {
-                    result.bookmark.updateAISummary(summary);
-                    this.saveSections();
+                    enableScripts: false,
+                    retainContextWhenHidden: true
                 }
+            );
 
-                // create and show a webview panel with markdown content
-                const filename = path.basename(uri.fsPath);
-                const panel = vscode.window.createWebviewPanel(
-                    'aiSummary',
-                    `AI Summary - ${filename}`,
-                    vscode.ViewColumn.Beside,
-                    {
-                        enableScripts: false,
-                        retainContextWhenHidden: true
-                    }
-                );
+            const htmlContent = summary
+                .replace(/\n/g, '<br>')
+                .replace(/### (.*?)(<br>|$)/g, '<h3>$1</h3>')
+                .replace(/## (.*?)(<br>|$)/g, '<h2>$1</h2>')
+                .replace(/# (.*?)(<br>|$)/g, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/^- (.*)(<br>|$)/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
 
-                // simple HTML rendering of markdown content
-                const htmlContent = summary
-                    .replace(/\n/g, '<br>')
-                    .replace(/### (.*?)(<br>|$)/g, '<h3>$1</h3>')
-                    .replace(/## (.*?)(<br>|$)/g, '<h2>$1</h2>')
-                    .replace(/# (.*?)(<br>|$)/g, '<h1>$1</h1>')
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/`(.*?)`/g, '<code>$1</code>')
-                    .replace(/^- (.*)(<br>|$)/gm, '<li>$1</li>')
-                    .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
-
-                panel.webview.html = `
+            panel.webview.html = `
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -334,35 +306,10 @@ export class DirectoryWorker
                     </body>
                     </html>
                 `;
-            });
-        } catch (error)
-        {
-            console.error('Error generating AI summary:', error);
-            vscode.window.showErrorMessage('Failed to generate AI summary');
-        }
-    }
-
-    public async addComment(uri: vscode.Uri): Promise<void>
-    {
-        const comment = await vscode.window.showInputBox({
-            placeHolder: 'Enter a comment for this bookmark',
-            prompt: 'Add context or notes about this file/folder'
         });
-
-        if (comment)
-        {
-            const result = this.findBookmarkOrParentByUri(uri);
-            if (result)
-            {
-                result.bookmark.comment = comment;
-                this.saveSections();
-                vscode.window.showInformationMessage('Comment added to bookmark');
-                return;
-            }
-        }
     }
 
-    public async addTags(uri: vscode.Uri): Promise<void>
+    public async addTags(uri: vscode.Uri): Promise<void> 
     {
         const tagsInput = await vscode.window.showInputBox({
             placeHolder: 'Enter tags separated by commas (e.g., api, authentication, important)',
@@ -396,10 +343,8 @@ export class DirectoryWorker
             return;
         }
 
-        // handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath)
-            ? uri.fsPath
-            : path.join(workspaceRoot, uri.fsPath);
+        // uri.fsPath is always absolute from VS Code
+        const filePath = uri.fsPath;
 
         // Check if the file is within the workspace
         const relativePath = path.relative(workspaceRoot, filePath);
@@ -411,62 +356,41 @@ export class DirectoryWorker
             return;
         }
 
-        try
-        {
-            const gitService = new GitService(workspaceRoot);
+        const gitService = new GitService(workspaceRoot);
+        const currentBranch = await gitService.getCurrentBranch();
 
-            // First check if this is a git repository
-            try
+        const diffOptions = [
             {
-                await gitService.getCurrentBranch();
-            } catch (error)
+                label: 'Working Directory vs HEAD',
+                description: 'Show uncommitted changes',
+                option: 'working'
+            },
             {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
+                label: 'Local vs Remote',
+                description: `Compare with origin/${currentBranch}`,
+                option: 'remote'
+            },
+            {
+                label: 'Between Branches',
+                description: 'Choose two branches to compare',
+                option: 'branches'
+            },
+            {
+                label: 'File History',
+                description: 'Show recent commits affecting this file',
+                option: 'history'
             }
+        ];
 
-            // Get the current branch
-            const currentBranch = await gitService.getCurrentBranch();
+        const selectedOption = await vscode.window.showQuickPick(diffOptions, {
+            placeHolder: 'Choose diff type'
+        });
 
-            // Give user options for what type of diff to show
-            const diffOptions = [
-                {
-                    label: 'Working Directory vs HEAD',
-                    description: 'Show uncommitted changes',
-                    option: 'working'
-                },
-                {
-                    label: 'Local vs Remote',
-                    description: `Compare with origin/${currentBranch}`,
-                    option: 'remote'
-                },
-                {
-                    label: 'Between Branches',
-                    description: 'Choose two branches to compare',
-                    option: 'branches'
-                },
-                {
-                    label: 'File History',
-                    description: 'Show recent commits affecting this file',
-                    option: 'history'
-                }
-            ];
+        if (!selectedOption) return;
 
-            const selectedOption = await vscode.window.showQuickPick(diffOptions, {
-                placeHolder: 'Choose diff type'
-            });
-
-            if (!selectedOption) return;
-
-            // Create a proper URI with the resolved path
-            const resolvedUri = vscode.Uri.file(filePath);
-            await this.handleGitDiffOption(resolvedUri, gitService, selectedOption.option, currentBranch);
-
-        } catch (error)
-        {
-            console.error('Git diff failed:', error);
-            vscode.window.showErrorMessage(`Failed to get git diff: ${error}`);
-        }
+        // Create a proper URI with the resolved path
+        const resolvedUri = vscode.Uri.file(filePath);
+        await this.handleGitDiffOption(resolvedUri, gitService, selectedOption.option, currentBranch);
     }
 
     public async cherryPickChanges(uri: vscode.Uri): Promise<void>
@@ -481,10 +405,7 @@ export class DirectoryWorker
             return;
         }
 
-        // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath)
-            ? uri.fsPath
-            : path.join(workspaceRoot, uri.fsPath);
+        const filePath = uri.fsPath;
 
         // Check if the file is within the workspace
         const relativePath = path.relative(workspaceRoot, filePath);
@@ -496,72 +417,53 @@ export class DirectoryWorker
             return;
         }
 
-        try
+        const gitService = new GitService(workspaceRoot);
+
+        // Get all branches
+        const branches = await gitService.getAllBranches();
+        const branchNames = branches.map(b => b.name).filter(name => !name.startsWith('remotes/'));
+        const currentBranch = await gitService.getCurrentBranch();
+
+        // Filter out current branch
+        const otherBranches = branchNames.filter(name => name !== currentBranch);
+
+        if (otherBranches.length === 0)
         {
-            const gitService = new GitService(workspaceRoot);
-
-            // First check if this is a git repository
-            try
-            {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
-            }
-
-            // Get all branches
-            const branches = await gitService.getAllBranches();
-            const branchNames = branches.map(b => b.name).filter(name => !name.startsWith('remotes/'));
-            const currentBranch = await gitService.getCurrentBranch();
-
-            // Filter out current branch
-            const otherBranches = branchNames.filter(name => name !== currentBranch);
-
-            if (otherBranches.length === 0)
-            {
-                vscode.window.showInformationMessage('No other branches available for cherry-picking.');
-                return;
-            }
-
-            // Let user select source branch
-            const sourceBranch = await vscode.window.showQuickPick(otherBranches, {
-                placeHolder: 'Select branch to cherry-pick from'
-            });
-
-            if (!sourceBranch) return;
-
-            // Give user options for cherry-pick type
-            const cherryPickOptions = [
-                {
-                    label: 'Cherry-pick File Changes',
-                    description: 'Apply changes to this specific file from selected commits',
-                    option: 'file'
-                },
-                {
-                    label: 'Cherry-pick Entire Commits',
-                    description: 'Apply entire commits (all files changed in those commits)',
-                    option: 'commits'
-                }
-            ];
-
-            const selectedOption = await vscode.window.showQuickPick(cherryPickOptions, {
-                placeHolder: 'Choose cherry-pick type'
-            });
-
-            if (!selectedOption) return;
-
-            // Create a proper URI with the resolved path
-            const resolvedUri = vscode.Uri.file(filePath);
-            await this.handleCherryPickOption(resolvedUri, gitService, sourceBranch, selectedOption.option);
-
-        } catch (error)
-        {
-            console.error('Cherry-pick failed:', error);
-            vscode.window.showErrorMessage(`Failed to cherry-pick: ${error}`);
+            vscode.window.showInformationMessage('No other branches available for cherry-picking.');
+            return;
         }
+
+        // Let user select source branch
+        const sourceBranch = await vscode.window.showQuickPick(otherBranches, {
+            placeHolder: 'Select branch to cherry-pick from'
+        });
+
+        if (!sourceBranch) return;
+
+        const cherryPickOptions = [
+            {
+                label: 'Cherry-pick File Changes',
+                description: 'Apply changes to this specific file from selected commits',
+                option: 'file'
+            },
+            {
+                label: 'Cherry-pick Entire Commits',
+                description: 'Apply entire commits (all files changed in those commits)',
+                option: 'commits'
+            }
+        ];
+
+        const selectedOption = await vscode.window.showQuickPick(cherryPickOptions, {
+            placeHolder: 'Choose cherry-pick type'
+        });
+
+        if (!selectedOption) return;
+
+        const resolvedUri = vscode.Uri.file(filePath);
+        await this.handleCherryPickOption(resolvedUri, gitService, sourceBranch, selectedOption.option);
     }
 
+    // TODO: dodati batch staging?
     public async gitAddFile(uri: vscode.Uri): Promise<void>
     {
         const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
@@ -574,10 +476,7 @@ export class DirectoryWorker
             return;
         }
 
-        // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath)
-            ? uri.fsPath
-            : path.join(workspaceRoot, uri.fsPath);
+        const filePath = uri.fsPath;
 
         const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
@@ -588,78 +487,57 @@ export class DirectoryWorker
             return;
         }
 
-        try
+        const gitService = new GitService(workspaceRoot);
+        const status = await gitService.getFileStatus(filePath);
+
+        if (status.isStaged)
         {
-            const gitService = new GitService(workspaceRoot);
+            const action = await vscode.window.showInformationMessage(
+                `'${path.basename(filePath)}' is already staged. What would you like to do?`,
+                'Unstage', 'Cancel'
+            );
 
-            // Check if git repository
-            try
+            if (action === 'Unstage')
             {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
-            }
-
-            // Get file status first
-            const status = await gitService.getFileStatus(filePath);
-
-            if (status.isStaged)
-            {
-                const action = await vscode.window.showInformationMessage(
-                    `'${path.basename(filePath)}' is already staged. What would you like to do?`,
-                    'Unstage', 'Cancel'
-                );
-
-                if (action === 'Unstage')
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: "Unstaging file...",
+                    cancellable: false
+                }, async () =>
                 {
-                    await vscode.window.withProgress({
-                        location: vscode.ProgressLocation.Notification,
-                        title: "Unstaging file...",
-                        cancellable: false
-                    }, async () =>
+                    const result = await gitService.unstageFile(filePath);
+
+                    if (result.success)
                     {
-                        const result = await gitService.unstageFile(filePath);
-
-                        if (result.success)
-                        {
-                            vscode.window.showInformationMessage(result.message);
-                        }
-                        else
-                        {
-                            vscode.window.showErrorMessage(result.message);
-                        }
-                    });
-                }
-                return;
+                        vscode.window.showInformationMessage(result.message);
+                    }
+                    else
+                    {
+                        vscode.window.showErrorMessage(result.message);
+                    }
+                });
             }
-
-            // Try to stage the file even if status detection is uncertain
-            // Git will handle the case where there are no changes
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Staging file...",
-                cancellable: false
-            }, async () =>
-            {
-                const result = await gitService.stageFile(filePath);
-
-                if (result.success)
-                {
-                    vscode.window.showInformationMessage(result.message);
-                }
-                else
-                {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-
-        } catch (error)
-        {
-            console.error('Git add failed:', error);
-            vscode.window.showErrorMessage(`Failed to stage file: ${error}`);
+            return;
         }
+
+        // pokusaj da stage-uješ fajl, git ce handlovat ako nema izmena
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Staging file...",
+            cancellable: false
+        }, async () =>
+        {
+            const result = await gitService.stageFile(filePath);
+
+            if (result.success)
+            {
+                vscode.window.showInformationMessage(result.message);
+            }
+            else
+            {
+                vscode.window.showErrorMessage(result.message);
+            }
+        });
     }
 
     public async gitCommitFile(uri: vscode.Uri): Promise<void>
@@ -674,11 +552,7 @@ export class DirectoryWorker
             return;
         }
 
-        // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath)
-            ? uri.fsPath
-            : path.join(workspaceRoot, uri.fsPath);
-
+        const filePath = uri.fsPath;
         const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
         {
@@ -688,69 +562,47 @@ export class DirectoryWorker
             return;
         }
 
-        try
+        const gitService = new GitService(workspaceRoot);
+        const status = await gitService.getFileStatus(filePath);
+
+        if (!status.isModified && !status.isUntracked && !status.isStaged)
         {
-            const gitService = new GitService(workspaceRoot);
-
-            // Check if git repository
-            try
-            {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
-            }
-
-            // Get file status
-            const status = await gitService.getFileStatus(filePath);
-
-            if (!status.isModified && !status.isUntracked && !status.isStaged)
-            {
-                vscode.window.showInformationMessage(`No changes to commit for '${path.basename(filePath)}'`);
-                return;
-            }
-
-            // Ask for commit message
-            const commitMessage = await vscode.window.showInputBox({
-                prompt: `Enter commit message for '${path.basename(filePath)}'`,
-                placeHolder: 'feat: add new feature',
-                validateInput: (value) =>
-                {
-                    if (!value || value.trim().length === 0)
-                    {
-                        return 'Commit message cannot be empty';
-                    }
-                    return null;
-                }
-            });
-
-            if (!commitMessage) return;
-
-            // Commit the file
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Committing file...",
-                cancellable: false
-            }, async () =>
-            {
-                const result = await gitService.commitFile(filePath, commitMessage);
-
-                if (result.success)
-                {
-                    vscode.window.showInformationMessage(result.message);
-                }
-                else
-                {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-
-        } catch (error)
-        {
-            console.error('Git commit failed:', error);
-            vscode.window.showErrorMessage(`Failed to commit file: ${error}`);
+            vscode.window.showInformationMessage(`No changes to commit for '${path.basename(filePath)}'`);
+            return;
         }
+
+        const commitMessage = await vscode.window.showInputBox({
+            prompt: `Enter commit message for '${path.basename(filePath)}'`,
+            placeHolder: 'feat: add new feature',
+            validateInput: (value) =>
+            {
+                if (!value || value.trim().length === 0)
+                {
+                    return 'Commit message cannot be empty';
+                }
+                return null;
+            }
+        });
+
+        if (!commitMessage) return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Committing file...",
+            cancellable: false
+        }, async () =>
+        {
+            const result = await gitService.commitFile(filePath, commitMessage);
+
+            if (result.success)
+            {
+                vscode.window.showInformationMessage(result.message);
+            }
+            else
+            {
+                vscode.window.showErrorMessage(result.message);
+            }
+        });
     }
 
     public async gitStashFile(uri: vscode.Uri): Promise<void>
@@ -765,10 +617,7 @@ export class DirectoryWorker
             return;
         }
 
-        // Handle both absolute and relative paths
-        const filePath = path.isAbsolute(uri.fsPath)
-            ? uri.fsPath
-            : path.join(workspaceRoot, uri.fsPath);
+        const filePath = uri.fsPath;
 
         const relativePath = path.relative(workspaceRoot, filePath);
         if (relativePath.startsWith('..'))
@@ -779,67 +628,49 @@ export class DirectoryWorker
             return;
         }
 
-        try
+        const gitService = new GitService(workspaceRoot);
+
+        // Get file status
+        const status = await gitService.getFileStatus(filePath);
+
+        if (!status.isModified && !status.isUntracked)
         {
-            const gitService = new GitService(workspaceRoot);
-
-            // Check if git repository
-            try
-            {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
-            }
-
-            // Get file status
-            const status = await gitService.getFileStatus(filePath);
-
-            if (!status.isModified && !status.isUntracked)
-            {
-                vscode.window.showInformationMessage(`No changes to stash for '${path.basename(filePath)}'`);
-                return;
-            }
-
-            // Ask for stash message (optional)
-            const stashMessage = await vscode.window.showInputBox({
-                prompt: `Enter stash message for '${path.basename(filePath)}' (optional)`,
-                placeHolder: 'WIP: temporary changes'
-            });
-
-            // Confirm stash action
-            const confirmation = await vscode.window.showWarningMessage(
-                `Stash changes for '${path.basename(filePath)}'? This will save the changes and revert the file to the last commit.`,
-                'Yes, Stash', 'Cancel'
-            );
-
-            if (confirmation !== 'Yes, Stash') return;
-
-            // Stash the file
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Stashing file...",
-                cancellable: false
-            }, async () =>
-            {
-                const result = await gitService.stashFile(filePath, stashMessage || undefined);
-
-                if (result.success)
-                {
-                    vscode.window.showInformationMessage(result.message);
-                }
-                else
-                {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-
-        } catch (error)
-        {
-            console.error('Git stash failed:', error);
-            vscode.window.showErrorMessage(`Failed to stash file: ${error}`);
+            vscode.window.showInformationMessage(`No changes to stash for '${path.basename(filePath)}'`);
+            return;
         }
+
+        // Ask for stash message (optional)
+        const stashMessage = await vscode.window.showInputBox({
+            prompt: `Enter stash message for '${path.basename(filePath)}' (optional)`,
+            placeHolder: 'WIP: temporary changes'
+        });
+
+        // Confirm stash action
+        const confirmation = await vscode.window.showWarningMessage(
+            `Stash changes for '${path.basename(filePath)}'? This will save the changes and revert the file to the last commit.`,
+            'Yes, Stash', 'Cancel'
+        );
+
+        if (confirmation !== 'Yes, Stash') return;
+
+        // Stash the file
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Stashing file...",
+            cancellable: false
+        }, async () =>
+        {
+            const result = await gitService.stashFile(filePath, stashMessage || undefined);
+
+            if (result.success)
+            {
+                vscode.window.showInformationMessage(result.message);
+            }
+            else
+            {
+                vscode.window.showErrorMessage(result.message);
+            }
+        });
     }
 
     public async gitPushBookmarkedFiles(): Promise<void>
@@ -854,120 +685,109 @@ export class DirectoryWorker
             return;
         }
 
+        const gitService = new GitService(workspaceRoot);
+
+        // Check if git repository
         try
         {
-            const gitService = new GitService(workspaceRoot);
-
-            // Check if git repository
-            try
-            {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
-            }
-
-            // Collect all bookmarked files
-            const bookmarkedFiles: string[] = [];
-            const skippedFiles: string[] = [];
-
-            console.log('Git Push - Workspace root:', workspaceRoot);
-            console.log('Git Push - Total bookmarked files:', this.bookmarkSections.reduce((sum, s) => sum + s.directories.length, 0));
-
-            for (const section of this.bookmarkSections)
-            {
-                for (const dir of section.directories)
-                {
-                    // If the path is already absolute, use it; otherwise resolve it relative to workspace
-                    const absolutePath = path.isAbsolute(dir.path)
-                        ? dir.path
-                        : path.join(workspaceRoot, dir.path);
-
-                    // Normalize paths for comparison
-                    const normalizedWorkspace = path.resolve(workspaceRoot);
-                    const normalizedPath = path.resolve(absolutePath);
-                    const relativePath = path.relative(normalizedWorkspace, normalizedPath);
-
-                    console.log('Checking file:', {
-                        fileName: path.basename(dir.path),
-                        originalPath: dir.path,
-                        absolutePath: absolutePath,
-                        relativePath: relativePath,
-                        startsWithDotDot: relativePath.startsWith('..'),
-                        isAbsolute: path.isAbsolute(relativePath)
-                    });
-
-                    // Only include files that are within the workspace
-                    if (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
-                    {
-                        bookmarkedFiles.push(absolutePath);
-                    }
-                    else
-                    {
-                        skippedFiles.push(path.basename(dir.path));
-                    }
-                }
-            }
-
-            console.log('Files to push:', bookmarkedFiles.length);
-            console.log('Files skipped:', skippedFiles.length);
-
-            if (bookmarkedFiles.length === 0)
-            {
-                if (skippedFiles.length > 0)
-                {
-                    vscode.window.showWarningMessage(
-                        `No bookmarked files within the workspace to push.\n\n${skippedFiles.length} file(s) were skipped because they are outside the workspace:\n${skippedFiles.slice(0, 5).join(', ')}${skippedFiles.length > 5 ? '...' : ''}`
-                    );
-                }
-                else
-                {
-                    vscode.window.showInformationMessage('No bookmarked files to push.');
-                }
-                return;
-            }
-
-            // Ask for commit message
-            const commitMessage = await vscode.window.showInputBox({
-                prompt: `Enter commit message for ${bookmarkedFiles.length} bookmarked file(s)`,
-                placeHolder: 'feat: update bookmarked files',
-                validateInput: (value) =>
-                {
-                    if (!value || value.trim().length === 0)
-                    {
-                        return 'Commit message cannot be empty';
-                    }
-                    return null;
-                }
-            });
-
-            if (!commitMessage) return;
-
-            // Stage, commit, and push all bookmarked files
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Pushing bookmarked files...",
-                cancellable: false
-            }, async () =>
-            {
-                const result = await gitService.stageCommitAndPushFiles(bookmarkedFiles, commitMessage);
-
-                if (result.success)
-                {
-                    vscode.window.showInformationMessage(result.message);
-                }
-                else
-                {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-
+            await gitService.getCurrentBranch();
         } catch (error)
         {
-            console.error('Git push bookmarked files failed:', error);
-            vscode.window.showErrorMessage(`Failed to push bookmarked files: ${error}`);
+            vscode.window.showErrorMessage('This workspace is not a Git repository.');
+            return;
         }
+
+        const bookmarkedFiles: string[] = [];
+        const skippedFiles: string[] = [];
+
+        console.log('Git Push - Workspace root:', workspaceRoot);
+        console.log('Git Push - Total bookmarked files:', this.bookmarkSections.reduce((sum, s) => sum + s.directories.length, 0));
+
+        for (const section of this.bookmarkSections)
+        {
+            for (const dir of section.directories)
+            {
+                const absolutePath = path.isAbsolute(dir.path)
+                    ? dir.path
+                    : path.join(workspaceRoot, dir.path);
+
+                const normalizedWorkspace = path.resolve(workspaceRoot);
+                const normalizedPath = path.resolve(absolutePath);
+                const relativePath = path.relative(normalizedWorkspace, normalizedPath);
+
+                console.log('Checking file:', {
+                    fileName: path.basename(dir.path),
+                    originalPath: dir.path,
+                    absolutePath: absolutePath,
+                    relativePath: relativePath,
+                    startsWithDotDot: relativePath.startsWith('..'),
+                    isAbsolute: path.isAbsolute(relativePath)
+                });
+
+                if (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
+                {
+                    bookmarkedFiles.push(absolutePath);
+                }
+                else
+                {
+                    skippedFiles.push(path.basename(dir.path));
+                }
+            }
+        }
+
+        console.log('Files to push:', bookmarkedFiles.length);
+        console.log('Files skipped:', skippedFiles.length);
+
+        // TODO: mozda prikazati progress bar?
+        if (bookmarkedFiles.length === 0)
+        {
+            if (skippedFiles.length > 0)
+            {
+                vscode.window.showWarningMessage(
+                    `No bookmarked files within the workspace to push.\n\n${skippedFiles.length} file(s) were skipped because they are outside the workspace:\n${skippedFiles.slice(0, 5).join(', ')}${skippedFiles.length > 5 ? '...' : ''}`
+                );
+            }
+            else
+            {
+                vscode.window.showInformationMessage('No bookmarked files to push.');
+            }
+            return;
+        }
+
+        // Ask for commit message
+        const commitMessage = await vscode.window.showInputBox({
+            prompt: `Enter commit message for ${bookmarkedFiles.length} bookmarked file(s)`,
+            placeHolder: 'feat: update bookmarked files',
+            validateInput: (value) =>
+            {
+                if (!value || value.trim().length === 0)
+                {
+                    return 'Commit message cannot be empty';
+                }
+                return null;
+            }
+        });
+
+        if (!commitMessage) return;
+
+        // Stage, commit, and push all bookmarked files
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Pushing bookmarked files...",
+            cancellable: false
+        }, async () =>
+        {
+            const result = await gitService.stageCommitAndPushFiles(bookmarkedFiles, commitMessage);
+
+            if (result.success)
+            {
+                vscode.window.showInformationMessage(result.message);
+            }
+            else
+            {
+                vscode.window.showErrorMessage(result.message);
+            }
+        });
     }
 
     public async gitFetch(): Promise<void>
@@ -982,47 +802,29 @@ export class DirectoryWorker
             return;
         }
 
-        try
-        {
-            const gitService = new GitService(workspaceRoot);
+        const gitService = new GitService(workspaceRoot);
 
-            // Check if git repository
-            try
+        // fetch sa remote-a
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Fetching from remote...",
+            cancellable: false
+        }, async () =>
+        {
+            const success = await gitService.fetch();
+
+            if (success)
             {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
+                vscode.window.showInformationMessage('Successfully fetched from remote');
             }
-
-            // Fetch from remote
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Fetching from remote...",
-                cancellable: false
-            }, async () =>
+            else
             {
-                const success = await gitService.fetch();
-
-                if (success)
-                {
-                    vscode.window.showInformationMessage('Successfully fetched from remote');
-                }
-                else
-                {
-                    vscode.window.showErrorMessage('Failed to fetch from remote');
-                }
-            });
-
-        } catch (error)
-        {
-            console.error('Git fetch failed:', error);
-            vscode.window.showErrorMessage(`Failed to fetch: ${error}`);
-        }
+                vscode.window.showErrorMessage('Failed to fetch from remote');
+            }
+        });
     }
 
-    public async gitPull(): Promise<void>
+    public async gitPull(): Promise<void> 
     {
         const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
             ? this.workspaceRoot[0].uri.fsPath
@@ -1034,71 +836,52 @@ export class DirectoryWorker
             return;
         }
 
-        try
-        {
-            const gitService = new GitService(workspaceRoot);
+        const gitService = new GitService(workspaceRoot);
 
-            // Check if git repository
-            try
+        // Check for uncommitted changes
+        const status = await gitService.getGitInfo();
+        if (status.hasLocalChanges)
+        {
+            const action = await vscode.window.showWarningMessage(
+                'You have uncommitted changes. What would you like to do?',
+                'Stash and Pull', 'Cancel'
+            );
+
+            if (action !== 'Stash and Pull')
             {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
                 return;
             }
 
-            // Check for uncommitted changes
-            const status = await gitService.getGitInfo();
-            if (status.hasLocalChanges)
-            {
-                const action = await vscode.window.showWarningMessage(
-                    'You have uncommitted changes. What would you like to do?',
-                    'Stash and Pull', 'Cancel'
-                );
-
-                if (action !== 'Stash and Pull')
-                {
-                    return;
-                }
-
-                // Stash changes
-                await vscode.window.withProgress({
-                    location: vscode.ProgressLocation.Notification,
-                    title: "Stashing changes...",
-                    cancellable: false
-                }, async () =>
-                {
-                    await gitService.stashChanges('Auto-stash before pull');
-                });
-            }
-
-            // Pull from remote
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: "Pulling from remote...",
+                title: "Stashing changes...",
                 cancellable: false
             }, async () =>
             {
-                const success = await gitService.pull();
-
-                if (success)
-                {
-                    vscode.window.showInformationMessage('Successfully pulled from remote');
-                }
-                else
-                {
-                    vscode.window.showErrorMessage('Failed to pull from remote. You may need to resolve conflicts.');
-                }
+                await gitService.stashChanges('Auto-stash before pull');
             });
-
-        } catch (error)
-        {
-            console.error('Git pull failed:', error);
-            vscode.window.showErrorMessage(`Failed to pull: ${error}`);
         }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Pulling from remote...",
+            cancellable: false
+        }, async () =>
+        {
+            const success = await gitService.pull();
+
+            if (success)
+            {
+                vscode.window.showInformationMessage('Successfully pulled from remote');
+            }
+            else
+            {
+                vscode.window.showErrorMessage('Failed to pull from remote. You may need to resolve conflicts.');
+            }
+        });
     }
 
+    // NOTE: treba da se vrati na ovo, mozda dodati interactive rebase?
     public async gitRebase(): Promise<void>
     {
         const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
@@ -1111,88 +894,68 @@ export class DirectoryWorker
             return;
         }
 
-        try
+        const gitService = new GitService(workspaceRoot);
+        const branches = await gitService.getAllBranches();
+        const branchNames = branches
+            .filter(b => !b.remote)
+            .map(b => b.name);
+
+        if (branchNames.length === 0)
         {
-            const gitService = new GitService(workspaceRoot);
-
-            // Check if git repository
-            try
-            {
-                await gitService.getCurrentBranch();
-            } catch (error)
-            {
-                vscode.window.showErrorMessage('This workspace is not a Git repository.');
-                return;
-            }
-
-            // Get list of branches
-            const branches = await gitService.getAllBranches();
-            const branchNames = branches
-                .filter(b => !b.remote)
-                .map(b => b.name);
-
-            if (branchNames.length === 0)
-            {
-                vscode.window.showErrorMessage('No branches found.');
-                return;
-            }
-
-            // Ask user to select a branch to rebase onto
-            const targetBranch = await vscode.window.showQuickPick(branchNames, {
-                placeHolder: 'Select branch to rebase onto',
-                canPickMany: false
-            });
-
-            if (!targetBranch)
-            {
-                return;
-            }
-
-            // Check for uncommitted changes
-            const status = await gitService.getGitInfo();
-            if (status.hasLocalChanges)
-            {
-                vscode.window.showWarningMessage(
-                    'You have uncommitted changes. Please commit or stash them before rebasing.'
-                );
-                return;
-            }
-
-            // Confirm rebase
-            const confirmation = await vscode.window.showWarningMessage(
-                `Rebase current branch onto '${targetBranch}'? This will rewrite commit history.`,
-                'Yes, Rebase', 'Cancel'
-            );
-
-            if (confirmation !== 'Yes, Rebase')
-            {
-                return;
-            }
-
-            // Perform rebase
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: `Rebasing onto ${targetBranch}...`,
-                cancellable: false
-            }, async () =>
-            {
-                const result = await gitService.rebase(targetBranch);
-
-                if (result.success)
-                {
-                    vscode.window.showInformationMessage(result.message);
-                }
-                else
-                {
-                    vscode.window.showErrorMessage(result.message);
-                }
-            });
-
-        } catch (error)
-        {
-            console.error('Git rebase failed:', error);
-            vscode.window.showErrorMessage(`Failed to rebase: ${error}`);
+            vscode.window.showErrorMessage('No branches found.');
+            return;
         }
+
+        // Ask user to select a branch to rebase onto
+        const targetBranch = await vscode.window.showQuickPick(branchNames, {
+            placeHolder: 'Select branch to rebase onto',
+            canPickMany: false
+        });
+
+        if (!targetBranch)
+        {
+            return;
+        }
+
+        // Check for uncommitted changes
+        const status = await gitService.getGitInfo();
+        if (status.hasLocalChanges)
+        {
+            vscode.window.showWarningMessage(
+                'You have uncommitted changes. Please commit or stash them before rebasing.'
+            );
+            return;
+        }
+
+        // Confirm rebase
+        const confirmation = await vscode.window.showWarningMessage(
+            `Rebase current branch onto '${targetBranch}'? This will rewrite commit history.`,
+            'Yes, Rebase', 'Cancel'
+        );
+
+        if (confirmation !== 'Yes, Rebase')
+        {
+            return;
+        }
+
+        // Perform rebase
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Rebasing onto ${targetBranch}...`,
+            cancellable: false
+        }, async () =>
+        {
+            const result = await gitService.rebase(targetBranch);
+
+            if (result.success)
+            {
+                vscode.window.showInformationMessage(result.message);
+            }
+            else
+            {
+                vscode.window.showErrorMessage(result.message);
+            }
+        });
     }
 
     public async gitOperations(): Promise<void>
@@ -1256,17 +1019,16 @@ export class DirectoryWorker
         });
     }
 
+    // FIXME: prompt mozda predugo, skratiti
     private async generateAIDiffSummary(diffContent: string, filePath: string, remoteBranch: string): Promise<void>
     {
-        try
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating AI diff summary...",
+            cancellable: false
+        }, async () =>
         {
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "Generating AI diff summary...",
-                cancellable: false
-            }, async () =>
-            {
-                const prompt = `Analyze this git diff and provide a clear, concise summary of the changes:
+            const prompt = `Analyze this git diff and provide a clear, concise summary of the changes:
 
 File: ${filePath}
 Comparing: local vs ${remoteBranch}
@@ -1282,32 +1044,31 @@ Please provide:
 
 Keep the summary focused and easy to understand.`;
 
-                const summary = await AIService.generateCustomSummary(prompt);
+            const summary = await AIService.generateCustomSummary(prompt);
 
-                // Create and show a webview panel with the diff summary
-                const panel = vscode.window.createWebviewPanel(
-                    'gitDiffSummary',
-                    `Git Diff Summary - ${path.basename(filePath)}`,
-                    vscode.ViewColumn.Beside,
-                    {
-                        enableScripts: false,
-                        retainContextWhenHidden: true
-                    }
-                );
+            const panel = vscode.window.createWebviewPanel(
+                'gitDiffSummary',
+                `Git Diff Summary - ${path.basename(filePath)}`,
+                vscode.ViewColumn.Beside,
+                {
+                    enableScripts: false,
+                    retainContextWhenHidden: true
+                }
+            );
 
-                // Simple HTML rendering of the summary
-                const htmlContent = summary
-                    .replace(/\n/g, '<br>')
-                    .replace(/### (.*?)(<br>|$)/g, '<h3>$1</h3>')
-                    .replace(/## (.*?)(<br>|$)/g, '<h2>$1</h2>')
-                    .replace(/# (.*?)(<br>|$)/g, '<h1>$1</h1>')
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/`(.*?)`/g, '<code>$1</code>')
-                    .replace(/^- (.*)(<br>|$)/gm, '<li>$1</li>')
-                    .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+            // Simple HTML rendering of the summary
+            const htmlContent = summary
+                .replace(/\n/g, '<br>')
+                .replace(/### (.*?)(<br>|$)/g, '<h3>$1</h3>')
+                .replace(/## (.*?)(<br>|$)/g, '<h2>$1</h2>')
+                .replace(/# (.*?)(<br>|$)/g, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/^- (.*)(<br>|$)/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
 
-                panel.webview.html = `
+            panel.webview.html = `
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -1369,12 +1130,7 @@ Keep the summary focused and easy to understand.`;
                     </body>
                     </html>
                 `;
-            });
-        } catch (error)
-        {
-            console.error('Error generating AI diff summary:', error);
-            vscode.window.showErrorMessage('Failed to generate AI diff summary');
-        }
+        });
     }
 
     public async exportTeamBookmarks(): Promise<void>
@@ -1447,149 +1203,131 @@ Keep the summary focused and easy to understand.`;
             return;
         }
 
-        try
+        const config = JSON.parse(configText);
+
+        // Validate the configuration structure
+        if (!config.sections || !Array.isArray(config.sections))
         {
-            const config = JSON.parse(configText);
-
-            // Validate the configuration structure
-            if (!config.sections || !Array.isArray(config.sections))
-            {
-                vscode.window.showErrorMessage('Invalid team bookmark configuration: missing sections array');
-                return;
-            }
-
-            const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
-                ? this.workspaceRoot[0].uri.fsPath
-                : undefined;
-
-            let sectionsToInject: BookmarkSection[];
-
-            if (workspaceRoot)
-            {
-                // For team bookmarks, we assume they come with relative paths
-                // so we don't need to convert them since we now store relative paths internally
-                sectionsToInject = config.sections.map((s: any) =>
-                {
-                    const directories = (s.directories || []).map((d: any) =>
-                    {
-                        return new TypedDirectory(
-                            d.path, // Keep the path as-is (should be relative from the config)
-                            d.type,
-                            d.comment,
-                            d.tags,
-                            d.addedBy,
-                            d.dateAdded ? new Date(d.dateAdded) : new Date(),
-                            d.aiSummary,
-                            d.lastSummaryUpdate ? new Date(d.lastSummaryUpdate) : undefined
-                        );
-                    });
-
-                    return new BookmarkSection(s.id, s.name, directories);
-                });
-            } else
-            {
-                // Create BookmarkSection objects directly with proper TypedDirectory reconstruction
-                sectionsToInject = config.sections.map((s: any) =>
-                {
-                    const directories = (s.directories || []).map((d: any) =>
-                    {
-                        return new TypedDirectory(
-                            d.path,
-                            d.type,
-                            d.comment,
-                            d.tags,
-                            d.addedBy,
-                            d.dateAdded ? new Date(d.dateAdded) : new Date(),
-                            d.aiSummary,
-                            d.lastSummaryUpdate ? new Date(d.lastSummaryUpdate) : undefined
-                        );
-                    });
-
-                    return new BookmarkSection(s.id, s.name, directories);
-                });
-            }
-
-            // Ask user how to handle the injection
-            const action = await vscode.window.showInformationMessage(
-                `Found ${sectionsToInject.length} bookmark sections to inject`,
-                'Replace Current', 'Merge with Current', 'Cancel'
-            );
-
-            switch (action)
-            {
-                case 'Replace Current':
-                    this.bookmarkSections = sectionsToInject;
-                    break;
-                case 'Merge with Current':
-                    this.bookmarkSections = this.mergeBookmarkSections(this.bookmarkSections, sectionsToInject);
-                    break;
-                default:
-                    return;
-            }
-
-            this.saveSections();
-            vscode.window.showInformationMessage(`Successfully injected ${sectionsToInject.length} bookmark sections!`);
-
-        } catch (error)
-        {
-            console.error('Error injecting team bookmarks:', error);
-            vscode.window.showErrorMessage('Failed to parse team bookmark configuration. Please check the JSON format.');
+            vscode.window.showErrorMessage('Invalid team bookmark configuration: missing sections array');
+            return;
         }
+
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        let sectionsToInject: BookmarkSection[];
+
+        if (workspaceRoot)
+        {
+            // For team bookmarks, we assume they come with relative paths
+            // so we don't need to convert them since we now store relative paths internally
+            sectionsToInject = config.sections.map((s: any) =>
+            {
+                const directories = (s.directories || []).map((d: any) =>
+                {
+                    return new TypedDirectory(
+                        d.path, // Keep the path as-is (should be relative from the config)
+                        d.type,
+                        d.tags,
+                        d.addedBy,
+                        d.dateAdded ? new Date(d.dateAdded) : new Date(),
+                        d.aiSummary,
+                        d.lastSummaryUpdate ? new Date(d.lastSummaryUpdate) : undefined
+                    );
+                });
+
+                return new BookmarkSection(s.id, s.name, directories);
+            });
+        } else
+        {
+            // Create BookmarkSection objects directly with proper TypedDirectory reconstruction
+            sectionsToInject = config.sections.map((s: any) =>
+            {
+                const directories = (s.directories || []).map((d: any) =>
+                {
+                    return new TypedDirectory(
+                        d.path,
+                        d.type,
+                        d.tags,
+                        d.addedBy,
+                        d.dateAdded ? new Date(d.dateAdded) : new Date(),
+                        d.aiSummary,
+                        d.lastSummaryUpdate ? new Date(d.lastSummaryUpdate) : undefined
+                    );
+                });
+
+                return new BookmarkSection(s.id, s.name, directories);
+            });
+        }
+
+        // Ask user how to handle the injection
+        const action = await vscode.window.showInformationMessage(
+            `Found ${sectionsToInject.length} bookmark sections to inject`,
+            'Replace Current', 'Merge with Current', 'Cancel'
+        );
+
+        switch (action)
+        {
+            case 'Replace Current':
+                this.bookmarkSections = sectionsToInject;
+                break;
+            case 'Merge with Current':
+                this.bookmarkSections = this.mergeBookmarkSections(this.bookmarkSections, sectionsToInject);
+                break;
+            default:
+                return;
+        }
+
+        this.saveSections();
+        vscode.window.showInformationMessage(`Successfully injected ${sectionsToInject.length} bookmark sections!`);
     }
 
     public async generateShareableConfig(): Promise<void>
     {
-        try
+        const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
+            ? this.workspaceRoot[0].uri.fsPath
+            : undefined;
+
+        if (!workspaceRoot)
         {
-            const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
-                ? this.workspaceRoot[0].uri.fsPath
-                : undefined;
-
-            if (!workspaceRoot)
-            {
-                vscode.window.showErrorMessage('No workspace detected. Cannot generate relative paths for sharing.');
-                return;
-            }
-
-            // Since we now store relative paths internally, we can use them directly
-            const currentUser = await this.getCurrentUser();
-            const config = {
-                version: '1.0.0',
-                lastUpdated: new Date().toISOString(),
-                updatedBy: currentUser,
-                sections: this.bookmarkSections
-            };
-
-            const configJson = JSON.stringify(config, null, 2);
-
-            // Create a new document with the shareable configuration
-            const doc = await vscode.workspace.openTextDocument({
-                content: configJson,
-                language: 'json'
-            });
-
-            await vscode.window.showTextDocument(doc, {
-                viewColumn: vscode.ViewColumn.Beside,
-                preview: false
-            });
-
-            vscode.window.showInformationMessage(
-                'Shareable team bookmark configuration generated! Copy this JSON and share with your team.',
-                'Copy to Clipboard'
-            ).then(action =>
-            {
-                if (action === 'Copy to Clipboard')
-                {
-                    vscode.env.clipboard.writeText(configJson);
-                    vscode.window.showInformationMessage('Configuration copied to clipboard!');
-                }
-            });
-
-        } catch (error)
-        {
-            console.error('Error generating shareable config:', error);
-            vscode.window.showErrorMessage('Failed to generate shareable configuration.');
+            vscode.window.showErrorMessage('No workspace detected. Cannot generate relative paths for sharing.');
+            return;
         }
+
+        // Since we now store relative paths internally, we can use them directly
+        const currentUser = await this.getCurrentUser();
+        const config = {
+            version: '1.0.0',
+            lastUpdated: new Date().toISOString(),
+            updatedBy: currentUser,
+            sections: this.bookmarkSections
+        };
+
+        const configJson = JSON.stringify(config, null, 2);
+
+        // Create a new document with the shareable configuration
+        const doc = await vscode.workspace.openTextDocument({
+            content: configJson,
+            language: 'json'
+        });
+
+        await vscode.window.showTextDocument(doc, {
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: false
+        });
+
+        vscode.window.showInformationMessage(
+            'Shareable team bookmark configuration generated! Copy this JSON and share with your team.',
+            'Copy to Clipboard'
+        ).then(action =>
+        {
+            if (action === 'Copy to Clipboard')
+            {
+                vscode.env.clipboard.writeText(configJson);
+                vscode.window.showInformationMessage('Configuration copied to clipboard!');
+            }
+        });
     }
 
     private mergeBookmarkSections(local: BookmarkSection[], imported: BookmarkSection[]): BookmarkSection[]
@@ -1613,7 +1351,6 @@ Keep the summary focused and easy to understand.`;
                 }
             } else
             {
-                // Add new section
                 merged.push(importedSection);
             }
         }
@@ -1657,6 +1394,7 @@ Keep the summary focused and easy to understand.`;
         });
     }
 
+    // TODO refactor - promeniti nacin na koji se cuvaju pathovi
     private createDirectoryEntries(directories: TypedDirectory[], sectionId: string): FileSystemObject[]
     {
         const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
@@ -1682,10 +1420,6 @@ Keep the summary focused and easy to understand.`;
             if (dir.aiSummary)
             {
                 indicators.push('🤖');
-            }
-            if (dir.comment)
-            {
-                indicators.push('💬');
             }
             if (dir.tags && dir.tags.length > 0)
             {
@@ -1737,33 +1471,26 @@ Keep the summary focused and easy to understand.`;
             else if (dir.priority === 'high') visualIndicators += '⚡ ';
             else if (dir.priority === 'low') visualIndicators += '⬇️ ';
 
-            // Status indicators
+            // status ikone
             if (dir.status === 'in-review') visualIndicators += '👀 ';
             else if (dir.status === 'completed') visualIndicators += '✅ ';
             else if (dir.status === 'archived') visualIndicators += '📦 ';
 
-            // Feature indicators
-            if (dir.comments.length > 0) visualIndicators += `💬${dir.comments.length} `;
+            // ostale stvari koje treba da se vide
             if (dir.aiSummary) visualIndicators += '🤖 ';
             if (dir.watchers.length > 0) visualIndicators += `👁️${dir.watchers.length} `;
             if (dir.relatedPRs.length > 0) visualIndicators += `🔗${dir.relatedPRs.length} `;
 
-            // Git status indicators
+            // git statusi
             if (dir.gitInfo?.hasLocalChanges) visualIndicators += '🔄 ';
             if (dir.gitInfo?.conflictStatus === 'conflicts') visualIndicators += '⚠️ ';
 
-            // Update the item label through the constructor property
-            // Tags appear first, then visual indicators, then filename
+            // Update labelu - prvo tags pa indikatori pa ime fajla
             const enhancedLabel = tagDisplay + visualIndicators + displayLabel;
             (item as any).label = enhancedLabel;
 
-            // Enhanced tooltip with comprehensive metadata
+            // tooltip sa svim info o fajlu
             let tooltip = `📁 ${file.fsPath}`;
-
-            if (dir.comment)
-            {
-                tooltip += `\n💬 Comment: ${dir.comment}`;
-            }
 
             if (dir.tags && dir.tags.length > 0)
             {
@@ -1820,7 +1547,6 @@ Keep the summary focused and easy to understand.`;
 
             // Set description for additional info in tree view
             let description = '';
-            if (dir.comments.length > 0) description += `💬${dir.comments.length} `;
             if (dir.watchers.length > 0) description += `👁️${dir.watchers.length} `;
             if (dir.priority !== 'medium') description += `📊${dir.priority} `;
 
@@ -1836,7 +1562,6 @@ Keep the summary focused and easy to understand.`;
             .getConfiguration(this.saveWorkspaceConfigurationSettingKey)
             .get(this.saveWorkspaceConfigurationSettingKey);
 
-        // Load sections
         const storedSections = this.workspaceRoot
             ? this.extensionContext.workspaceState.get(this.storedSectionsContextKey)
             : this.extensionContext.globalState.get(this.storedSectionsContextKey);
@@ -1849,10 +1574,8 @@ Keep the summary focused and easy to understand.`;
 
             this.bookmarkSections = storedSections.map((s: any) =>
             {
-                // Reconstruct TypedDirectory objects with proper Date objects
                 const directories = (s.directories || []).map((d: any) =>
                 {
-                    // Convert absolute paths to relative if we have a workspace root
                     let bookmarkPath = d.path;
                     if (workspaceRoot && path.isAbsolute(bookmarkPath))
                     {
@@ -1862,7 +1585,6 @@ Keep the summary focused and easy to understand.`;
                     const typedDir = new TypedDirectory(
                         bookmarkPath,
                         d.type,
-                        d.comment,
                         d.tags,
                         d.addedBy,
                         d.dateAdded ? new Date(d.dateAdded) : new Date(),
@@ -1893,7 +1615,6 @@ Keep the summary focused and easy to understand.`;
                         return new TypedDirectory(
                             d.path,
                             d.type,
-                            d.comment,
                             d.tags,
                             d.addedBy,
                             d.dateAdded ? new Date(d.dateAdded) : new Date(),
@@ -1908,14 +1629,14 @@ Keep the summary focused and easy to understand.`;
                 this.bookmarkSections = [defaultSection];
                 this.saveSections();
 
-                // Clear old bookmarks
+                // izbrisi stare bookmarks
                 this.workspaceRoot
                     ? this.extensionContext.workspaceState.update(this.storedBookmarksContextKey, undefined)
                     : this.extensionContext.globalState.update(this.storedBookmarksContextKey, undefined);
             }
         }
 
-        // Ensure at least one section exists
+        // mora barem jedna sekcija da postoji
         if (this.bookmarkSections.length === 0)
         {
             this.bookmarkSections.push(BookmarkSection.createDefault());
@@ -1940,7 +1661,8 @@ Keep the summary focused and easy to understand.`;
         return Math.random().toString(36).substr(2, 9);
     }
 
-    private findBookmarkByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null
+    // FIXME: ovo se poziva previse puta, optimizovati
+    private findBookmarkByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null 
     {
         var workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
             ? this.workspaceRoot[0].uri.fsPath
@@ -1948,14 +1670,11 @@ Keep the summary focused and easy to understand.`;
 
         for (const section of this.bookmarkSections)
         {
-            var bookmark = section.directories.find(d =>
+            const bookmark = section.directories.find(d =>
             {
-                // Handle both relative and absolute path matching
                 if (workspaceRoot && !path.isAbsolute(d.path))
                 {
-                    // Use path.join instead of path.resolve to avoid Windows path issues
-                    var absolutePath = path.join(workspaceRoot, d.path);
-                    // Compare using fsPath to normalize paths properly on Windows
+                    const absolutePath = path.join(workspaceRoot, d.path);
                     return absolutePath === uri.fsPath;
                 }
                 return d.path === uri.fsPath;
@@ -1970,7 +1689,6 @@ Keep the summary focused and easy to understand.`;
         return null;
     }
 
-    // New method to find bookmark for subdirectories/files within bookmarked folders
     private findParentBookmarkByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null
     {
         const workspaceRoot = this.workspaceRoot && this.workspaceRoot.length > 0
@@ -1983,10 +1701,8 @@ Keep the summary focused and easy to understand.`;
             {
                 let bookmarkPath: string;
 
-                // Handle both relative and absolute path matching
                 if (workspaceRoot && !path.isAbsolute(d.path))
                 {
-                    // Use path.join instead of path.resolve to avoid Windows path issues
                     bookmarkPath = path.join(workspaceRoot, d.path);
                 }
                 else
@@ -1994,10 +1710,7 @@ Keep the summary focused and easy to understand.`;
                     bookmarkPath = d.path;
                 }
 
-                // Check if the target URI is within this bookmarked directory
                 const relativePath = path.relative(bookmarkPath, uri.fsPath);
-
-                // If relativePath doesn't start with '..' then uri is within bookmarkPath
                 return !relativePath.startsWith('..') && relativePath !== '';
             });
 
@@ -2010,21 +1723,17 @@ Keep the summary focused and easy to understand.`;
         return null;
     }
 
-    // Enhanced method that tries both direct match and parent match
     private findBookmarkOrParentByUri(uri: vscode.Uri): { section: BookmarkSection, bookmark: TypedDirectory } | null
     {
-        // First try to find direct match
         const directMatch = this.findBookmarkByUri(uri);
         if (directMatch)
         {
             return directMatch;
         }
 
-        // If no direct match, try to find parent bookmark
         return this.findParentBookmarkByUri(uri);
     }
 
-    // Get current user identifier (git username or fallback)
     private async getCurrentUser(): Promise<string>
     {
         try
@@ -2055,71 +1764,53 @@ Keep the summary focused and easy to understand.`;
         this.saveSections();
     }
 
-    public async addQuickComment(uri: vscode.Uri, comment: string): Promise<void>
-    {
-        const result = this.findBookmarkOrParentByUri(uri);
-        if (result)
-        {
-            const currentUser = await this.getCurrentUser();
-            result.bookmark.addComment(currentUser, comment, 'general');
-            this.saveSections();
-        }
-    }
-
     public async createPullRequest(uri: vscode.Uri): Promise<void>
     {
-        try
+        const workspaceFolder = this.workspaceRoot?.[0];
+        if (!workspaceFolder)
         {
-            const workspaceFolder = this.workspaceRoot?.[0];
-            if (!workspaceFolder)
-            {
-                vscode.window.showErrorMessage('No workspace folder found');
-                return;
-            }
-
-            const git = simpleGit(workspaceFolder.uri.fsPath);
-            const status = await git.status();
-            const currentBranch = status.current;
-
-            if (!currentBranch)
-            {
-                vscode.window.showErrorMessage('Could not determine current branch');
-                return;
-            }
-
-            // Get PR details from user
-            const title = await vscode.window.showInputBox({
-                prompt: 'Enter PR title',
-                placeHolder: 'Fix: Update bookmark functionality'
-            });
-
-            if (!title) return;
-
-            const body = await vscode.window.showInputBox({
-                prompt: 'Enter PR description',
-                placeHolder: 'Describe your changes...'
-            });
-
-            const targetBranch = await vscode.window.showInputBox({
-                prompt: 'Enter target branch',
-                value: 'main',
-                placeHolder: 'main'
-            });
-
-            if (!targetBranch) return;
-
-            // Here you would typically use GitHub API to create the PR
-            // For now, just open the GitHub PR creation page
-            const repoUrl = await this.getRepositoryUrl();
-            if (repoUrl)
-            {
-                const prUrl = `${repoUrl}/compare/${targetBranch}...${currentBranch}?quick_pull=1&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body || '')}`;
-                vscode.env.openExternal(vscode.Uri.parse(prUrl));
-            }
+            vscode.window.showErrorMessage('No workspace folder found');
+            return;
         }
-        catch (error)
+
+        const git = simpleGit(workspaceFolder.uri.fsPath);
+        const status = await git.status();
+        const currentBranch = status.current;
+
+        if (!currentBranch)
         {
-            vscode.window.showErrorMessage(`Error creating PR: ${error}`);
+            vscode.window.showErrorMessage('Could not determine current branch');
+            return;
+        }
+
+        // Get PR details from user
+        const title = await vscode.window.showInputBox({
+            prompt: 'Enter PR title',
+            placeHolder: 'Fix: Update bookmark functionality'
+        });
+
+        if (!title) return;
+
+        const body = await vscode.window.showInputBox({
+            prompt: 'Enter PR description',
+            placeHolder: 'Describe your changes...'
+        });
+
+        const targetBranch = await vscode.window.showInputBox({
+            prompt: 'Enter target branch',
+            value: 'main',
+            placeHolder: 'main'
+        });
+
+        if (!targetBranch) return;
+
+        // Here you would typically use GitHub API to create the PR
+        // For now, just open the GitHub PR creation page
+        const repoUrl = await this.getRepositoryUrl();
+        if (repoUrl)
+        {
+            const prUrl = `${repoUrl}/compare/${targetBranch}...${currentBranch}?quick_pull=1&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body || '')}`;
+            vscode.env.openExternal(vscode.Uri.parse(prUrl));
         }
     }
 
@@ -2156,6 +1847,7 @@ Keep the summary focused and easy to understand.`;
         }
     }
 
+    // TODO: ovo mozda treba pomeriti u novu klasu GitHubService
     public async showOnGitHub(uri: vscode.Uri): Promise<void>
     {
         try
@@ -2163,21 +1855,17 @@ Keep the summary focused and easy to understand.`;
             const repoUrl = await this.getRepositoryUrl();
             if (repoUrl)
             {
-                // Get the relative path and open on GitHub
                 const workspaceFolder = this.workspaceRoot?.[0];
                 if (workspaceFolder)
                 {
                     const relativePath = path.relative(workspaceFolder.uri.fsPath, uri.fsPath);
-                    // Convert Windows backslashes to forward slashes for URL
                     const urlPath = relativePath.replace(/\\/g, '/');
 
-                    // Get the current branch or default to master
-                    let branch = 'master'; // Default fallback
+                    let branch = 'master';
                     try
                     {
                         const git = simpleGit(workspaceFolder.uri.fsPath);
 
-                        // First, try to get the default branch from remote HEAD
                         try
                         {
                             const remoteInfo = await git.raw(['symbolic-ref', 'refs/remotes/origin/HEAD']);
@@ -2207,7 +1895,9 @@ Keep the summary focused and easy to understand.`;
                     {
                         console.warn('Could not determine branch, using master:', gitError);
                         branch = 'master';
-                    } const githubUrl = `${repoUrl}/blob/${branch}/${urlPath}`;
+                    }
+
+                    const githubUrl = `${repoUrl}/blob/${branch}/${urlPath}`;
                     vscode.env.openExternal(vscode.Uri.parse(githubUrl));
                 }
                 else
@@ -2222,42 +1912,35 @@ Keep the summary focused and easy to understand.`;
         }
         catch (error)
         {
-            vscode.window.showErrorMessage(`Error opening GitHub: ${error}`);
+            vscode.window.showErrorMessage(`Error opening on GitHub: ${error}`);
         }
     }
 
     private async getRepositoryUrl(): Promise<string | null>
     {
-        try
+        const workspaceFolder = this.workspaceRoot?.[0];
+        if (!workspaceFolder) return null;
+
+        const git = simpleGit(workspaceFolder.uri.fsPath);
+        const remotes = await git.getRemotes(true);
+        const origin = remotes.find((r: any) => r.name === 'origin');
+
+        if (origin && origin.refs.fetch)
         {
-            const workspaceFolder = this.workspaceRoot?.[0];
-            if (!workspaceFolder) return null;
-
-            const git = simpleGit(workspaceFolder.uri.fsPath);
-            const remotes = await git.getRemotes(true);
-            const origin = remotes.find((r: any) => r.name === 'origin');
-
-            if (origin && origin.refs.fetch)
+            // Convert SSH to HTTPS URL if needed
+            let url = origin.refs.fetch;
+            if (url.startsWith('git@github.com:'))
             {
-                // Convert SSH to HTTPS URL if needed
-                let url = origin.refs.fetch;
-                if (url.startsWith('git@github.com:'))
-                {
-                    url = url.replace('git@github.com:', 'https://github.com/');
-                }
-                if (url.endsWith('.git'))
-                {
-                    url = url.slice(0, -4);
-                }
-                return url;
+                url = url.replace('git@github.com:', 'https://github.com/');
             }
+            if (url.endsWith('.git'))
+            {
+                url = url.slice(0, -4);
+            }
+            return url;
+        }
 
-            return null;
-        }
-        catch (error)
-        {
-            return null;
-        }
+        return null;
     }
 
     private async handleGitDiffOption(uri: vscode.Uri, gitService: GitService, option: string, currentBranch: string): Promise<void>
@@ -2295,10 +1978,10 @@ Keep the summary focused and easy to understand.`;
                     await this.showFileHistory(gitService, absolutePath);
                     break;
             }
-        } catch (error)
+        }
+        catch (error)
         {
-            console.error('Error handling git diff option:', error);
-            vscode.window.showErrorMessage(`Failed to show git diff: ${error}`);
+            vscode.window.showErrorMessage(`Error showing git diff: ${error}`);
         }
     }
 
@@ -2336,6 +2019,7 @@ Keep the summary focused and easy to understand.`;
         await this.presentDiffOptions(diff, path.basename(absolutePath), `Local vs ${remoteBranch}`, absolutePath, 'remote', remoteBranch);
     }
 
+    // TODO mozda dodati opciju za 3-way merge?
     private async showBranchDiff(gitService: GitService, absolutePath: string): Promise<void>
     {
         const branches = await gitService.getAllBranches();
@@ -2350,17 +2034,14 @@ Keep the summary focused and easy to understand.`;
         const branch1 = await vscode.window.showQuickPick(branchNames, {
             placeHolder: 'Select first branch'
         });
-
         if (!branch1) return;
 
         const branch2 = await vscode.window.showQuickPick(
             branchNames.filter(name => name !== branch1),
             { placeHolder: 'Select second branch' }
         );
-
         if (!branch2) return;
 
-        // Use the GitService method for consistent path handling
         const diff = await gitService.compareBranches(branch1, branch2, absolutePath);
 
         if (!diff || diff.trim() === '')
@@ -2384,7 +2065,7 @@ Keep the summary focused and easy to understand.`;
 
         const commitItems = history.commits.map(commit => ({
             label: commit.message.split('\n')[0], // First line of commit message
-            description: `${commit.author} • ${commit.date.toLocaleDateString()}`,
+            description: `${commit.author} - ${commit.date.toLocaleDateString()}`,
             detail: commit.hash.substring(0, 8),
             commit
         }));
@@ -2416,7 +2097,6 @@ Keep the summary focused and easy to understand.`;
         }
         else
         {
-            // fallback na text diff ako nema path
             await this.showDiffInEditor(diff, fileName, compareInfo);
         }
 
@@ -2463,7 +2143,6 @@ Keep the summary focused and easy to understand.`;
                 compareLabel = remoteBranch;
             }
 
-            // uzmi sadrzaj iz gita
             const git = simpleGit(workspaceRoot);
             const compareContent = await git.show([`${compareRef}:${normalizedPath}`]);
 
@@ -2473,7 +2152,6 @@ Keep the summary focused and easy to understand.`;
                 query: Buffer.from(compareContent).toString('base64')
             });
 
-            // registruj provider za custom scheme
             const disposable = vscode.workspace.registerTextDocumentContentProvider('git-diff', {
                 provideTextDocumentContent(uri: vscode.Uri): string
                 {
@@ -2481,10 +2159,9 @@ Keep the summary focused and easy to understand.`;
                 }
             });
 
-            // otvori trenutni fajl
+
             const currentUri = vscode.Uri.file(absolutePath);
 
-            // otvori diff editor konacno
             await vscode.commands.executeCommand(
                 'vscode.diff',
                 compareUri,
@@ -2492,13 +2169,12 @@ Keep the summary focused and easy to understand.`;
                 `${path.basename(absolutePath)} (${compareLabel} ↔ Working Tree)`
             );
 
-            // dispose provider posle delay da se otvori diff normalno
             setTimeout(() => disposable.dispose(), 1000);
         } catch (error)
         {
             console.error('Side-by-side diff failed:', error);
 
-            // probaj alternative ako ne radi
+            // NOTE: treba proveriti ovaj fallback, mozda ne radi uvek
             try
             {
                 const fileUri = vscode.Uri.file(absolutePath);
@@ -2525,16 +2201,15 @@ Keep the summary focused and easy to understand.`;
                     await this.showBranchCommitsForCherryPick(gitService, sourceBranch);
                     break;
             }
-        } catch (error)
+        }
+        catch (error)
         {
-            console.error('Error handling cherry-pick option:', error);
-            vscode.window.showErrorMessage(`Failed to handle cherry-pick: ${error}`);
+            vscode.window.showErrorMessage(`Error during cherry-pick: ${error}`);
         }
     }
 
     private async showFileCommitsForCherryPick(gitService: GitService, sourceBranch: string, absolutePath: string): Promise<void>
     {
-        // Get commits that affected this specific file from the source branch
         const commits = await gitService.getCommitsFromBranch(sourceBranch, absolutePath, 20);
 
         if (commits.length === 0)
@@ -2543,7 +2218,6 @@ Keep the summary focused and easy to understand.`;
             return;
         }
 
-        // Create commit selection items
         const commitItems = commits.map(commit => ({
             label: `${commit.hash.substring(0, 8)} - ${commit.message.split('\n')[0]}`,
             description: `${commit.author} • ${commit.date.toLocaleDateString()}`,
@@ -2551,7 +2225,6 @@ Keep the summary focused and easy to understand.`;
             commit
         }));
 
-        // Allow multi-select for commits
         const selectedCommits = await vscode.window.showQuickPick(commitItems, {
             placeHolder: `Select commits to cherry-pick for ${path.basename(absolutePath)}`,
             canPickMany: true
@@ -2559,7 +2232,6 @@ Keep the summary focused and easy to understand.`;
 
         if (!selectedCommits || selectedCommits.length === 0) return;
 
-        // Show confirmation dialog
         const commitMessages = selectedCommits.map(item =>
             `• ${item.commit.hash.substring(0, 8)}: ${item.commit.message.split('\n')[0]}`
         ).join('\n');
@@ -2571,7 +2243,6 @@ Keep the summary focused and easy to understand.`;
 
         if (confirmation !== 'Yes, Cherry-pick') return;
 
-        // Apply cherry-picks
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: "Cherry-picking file changes...",
@@ -2592,7 +2263,7 @@ Keep the summary focused and easy to understand.`;
                 results.push(result.success ? `✓ ${result.message}` : `✗ ${result.message}`);
             }
 
-            // Show results
+
             const successCount = results.filter(r => r.startsWith('✓')).length;
             const failureCount = results.filter(r => r.startsWith('✗')).length;
 
@@ -2611,9 +2282,9 @@ Keep the summary focused and easy to understand.`;
         });
     }
 
+    // TODO: napraviti unified view za results umesto ovako
     private async showBranchCommitsForCherryPick(gitService: GitService, sourceBranch: string): Promise<void>
     {
-        // Get recent commits from the source branch
         const commits = await gitService.getCommitsFromBranch(sourceBranch, undefined, 20);
 
         if (commits.length === 0)
@@ -2622,7 +2293,6 @@ Keep the summary focused and easy to understand.`;
             return;
         }
 
-        // Create commit selection items
         const commitItems = commits.map(commit => ({
             label: `${commit.hash.substring(0, 8)} - ${commit.message.split('\n')[0]}`,
             description: `${commit.author} • ${commit.date.toLocaleDateString()}`,
@@ -2630,7 +2300,6 @@ Keep the summary focused and easy to understand.`;
             commit
         }));
 
-        // Allow selection of commit range or individual commits
         const cherryPickType = await vscode.window.showQuickPick([
             {
                 label: 'Select Individual Commits',
@@ -2667,7 +2336,6 @@ Keep the summary focused and easy to understand.`;
 
         if (!selectedCommits || selectedCommits.length === 0) return;
 
-        // Show confirmation
         const commitMessages = selectedCommits.map(item =>
             `• ${item.commit.hash.substring(0, 8)}: ${item.commit.message.split('\n')[0]}`
         ).join('\n');
@@ -2679,7 +2347,6 @@ Keep the summary focused and easy to understand.`;
 
         if (confirmation !== 'Yes, Cherry-pick') return;
 
-        // Apply cherry-picks
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: "Cherry-picking commits...",
@@ -2699,7 +2366,6 @@ Keep the summary focused and easy to understand.`;
                 const result = await gitService.cherryPickCommit(commit.hash);
                 results.push(result.success ? `✓ ${result.message}` : `✗ ${result.message}`);
 
-                // If there's a failure, stop and let user handle it
                 if (!result.success && result.message.includes('conflict'))
                 {
                     const action = await vscode.window.showErrorMessage(
@@ -2718,13 +2384,14 @@ Keep the summary focused and easy to understand.`;
                         vscode.window.showInformationMessage('Please resolve conflicts manually, then run "git cherry-pick --continue"');
                         break;
                     }
-                    // Skip and continue with next commit
                 }
             }
 
             this.showDetailedResults(`Cherry-pick Results:\n\n${results.join('\n')}`);
         });
     }
+
+
 
     private async handleRangeCommitCherryPick(gitService: GitService, commitItems: any[]): Promise<void>
     {
@@ -2769,7 +2436,6 @@ Keep the summary focused and easy to understand.`;
 
     private async showDetailedResults(message: string): Promise<void>
     {
-        // Create and show results in a new document
         const doc = await vscode.workspace.openTextDocument({
             content: message,
             language: 'plaintext'
@@ -2781,3 +2447,4 @@ Keep the summary focused and easy to understand.`;
         });
     }
 }
+

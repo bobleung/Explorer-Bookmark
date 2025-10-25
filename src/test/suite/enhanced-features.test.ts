@@ -14,23 +14,13 @@ suite('Explorer Bookmark Enhanced Features Test Suite', () =>
         const testDir = new TypedDirectory(
             'test/file.ts',
             vscode.FileType.File,
-            'Test comment',
             ['test', 'important'],
             'testUser'
         );
 
-        // Test comment functionality
-        assert.strictEqual(testDir.comment, 'Test comment');
-
         // Test tag functionality
         testDir.addTag('new-tag');
         assert.ok(testDir.tags?.includes('new-tag'));
-
-        // Test watcher functionality
-        testDir.addWatcher('user1');
-        testDir.addWatcher('user2');
-        assert.strictEqual(testDir.watchers.length, 2);
-        assert.ok(testDir.isWatchedBy('user1'));
 
         // Test status and priority
         testDir.updateStatus('in-review', 'testUser');
@@ -70,7 +60,6 @@ suite('Explorer Bookmark Enhanced Features Test Suite', () =>
         const testDir = new TypedDirectory(
             'src/important.ts',
             vscode.FileType.File,
-            'Critical authentication logic',
             ['auth', 'security', 'critical'],
             'developer1'
         );
@@ -78,21 +67,18 @@ suite('Explorer Bookmark Enhanced Features Test Suite', () =>
         // Set up collaborative features
         testDir.updatePriority('critical', 'developer1');
         testDir.updateStatus('in-review', 'developer1');
-        testDir.addWatcher('reviewer1');
-        testDir.addWatcher('reviewer2');
         testDir.updateAISummary('Complex authentication module handling user sessions');
 
         // Simulate Git info
-        testDir.updateGitInfo({
+        testDir.gitInfo = {
             currentBranch: 'feature/auth-improvements',
             hasLocalChanges: true,
             conflictStatus: 'none'
-        });
+        };
 
         // Test that all indicator data is available
         assert.strictEqual(testDir.priority, 'critical');
         assert.strictEqual(testDir.status, 'in-review');
-        assert.strictEqual(testDir.watchers.length, 2);
         assert.ok(testDir.aiSummary);
         assert.ok(testDir.tags && testDir.tags.length > 0);
         assert.ok(testDir.gitInfo?.hasLocalChanges);
@@ -112,13 +98,11 @@ suite('Explorer Bookmark Enhanced Features Test Suite', () =>
             const { GitHubService } = require('../../services/GitHubService');
             const { AIService } = require('../../services/AIService');
             const { TeamBookmarkService } = require('../../services/TeamBookmarkService');
-            const { CommentService } = require('../../services/CommentService');
 
             assert.ok(GitService, 'GitService should be available');
             assert.ok(GitHubService, 'GitHubService should be available');
             assert.ok(AIService, 'AIService should be available');
             assert.ok(TeamBookmarkService, 'TeamBookmarkService should be available');
-            assert.ok(CommentService, 'CommentService should be available');
 
             console.log('✅ Service architecture properly structured');
         } catch (error)

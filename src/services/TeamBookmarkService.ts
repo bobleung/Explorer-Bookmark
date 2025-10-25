@@ -318,7 +318,6 @@ export class TeamBookmarkService
                 return new TypedDirectory(
                     relativePath,
                     dir.type,
-                    dir.comment,
                     dir.tags,
                     dir.addedBy,
                     dir.dateAdded,
@@ -347,7 +346,6 @@ export class TeamBookmarkService
                 return new TypedDirectory(
                     absolutePath,
                     dir.type,
-                    dir.comment,
                     dir.tags,
                     dir.addedBy,
                     dir.dateAdded,

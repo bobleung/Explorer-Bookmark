@@ -43,7 +43,7 @@
     "viewsWelcome": [
       {
         "view": "explorer-bookmark",
-        "contents": "Right click and add a file or folder.\n\nClick the + icon above to add a new section to organize your bookmarks.\n\n✨ New Features:\n• AI-powered file summaries\n• Team bookmark sharing\n• Comments and tags for bookmarks\n• Export/import bookmarks for collaboration"
+        "contents": "Right click and add a file or folder.\n\nClick the + icon above to add a new section to organize your bookmarks.\n\n✨ New Features:\n• AI-powered file summaries\n• Team bookmark sharing\n• Tags for bookmarks\n• Export/import bookmarks for collaboration"
       }
     ],
     "views": {
@@ -96,11 +96,6 @@
         "command": "directoryprovider/viewaisummary",
         "title": "AI Summary",
         "icon": "$(sparkle)"
-      },
-      {
-        "command": "directoryprovider/addbookmarkcomment",
-        "title": "Add Comment",
-        "icon": "$(comment)"
       },
       {
         "command": "directoryprovider/addbookmarktags",
@@ -171,11 +166,6 @@
         "command": "directoryprovider/injectteambookmarks",
         "title": "Inject Team Bookmarks",
         "icon": "$(file-code)"
-      },
-      {
-        "command": "directoryprovider/addcomment",
-        "title": "Add Comment",
-        "icon": "$(comment)"
       },
       {
         "command": "directoryprovider/updatestatus",
@@ -285,11 +275,6 @@
           "group": "ai"
         },
         {
-          "command": "directoryprovider/addbookmarkcomment",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
-          "group": "annotations"
-        },
-        {
           "command": "directoryprovider/addbookmarktags",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "annotations"
@@ -320,11 +305,6 @@
           "group": "git"
         },
         {
-          "command": "directoryprovider/addcomment",
-          "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
-          "group": "collaboration"
-        },
-        {
           "command": "directoryprovider/updatestatus",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "collaboration"
@@ -348,11 +328,6 @@
           "command": "directoryprovider/showgithub",
           "when": "view == explorer-bookmark && viewItem == directlyBookmarkedDirectory",
           "group": "github"
-        },
-        {
-          "command": "directoryprovider/addcomment",
-          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
-          "group": "collaboration"
         },
         {
           "command": "directoryprovider/updatestatus",
@@ -408,11 +383,6 @@
           "command": "directoryprovider/viewaisummary",
           "when": "view == explorer-bookmark && viewItem != bookmarkSection",
           "group": "ai"
-        },
-        {
-          "command": "directoryprovider/addbookmarkcomment",
-          "when": "view == explorer-bookmark && viewItem != bookmarkSection",
-          "group": "annotations"
         },
         {
           "command": "directoryprovider/addbookmarktags",

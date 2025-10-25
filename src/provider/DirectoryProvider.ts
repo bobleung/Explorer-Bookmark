@@ -71,12 +71,6 @@ export class DirectoryProvider implements vscode.TreeDataProvider<FileSystemObje
     await this.directoryOperator.viewAISummary(uri);
   }
 
-  async addComment(uri: vscode.Uri)
-  {
-    await this.directoryOperator.addComment(uri);
-    this.refresh();
-  }
-
   async addTags(uri: vscode.Uri)
   {
     await this.directoryOperator.addTags(uri);
@@ -155,20 +149,6 @@ export class DirectoryProvider implements vscode.TreeDataProvider<FileSystemObje
   {
     await this.directoryOperator.injectTeamBookmarks();
     this.refresh();
-  }
-
-  async addQuickComment(uri: vscode.Uri)
-  {
-    const comment = await vscode.window.showInputBox({
-      placeHolder: 'Enter your comment...',
-      prompt: 'Add a quick comment to this bookmark'
-    });
-
-    if (comment)
-    {
-      await this.directoryOperator.addQuickComment(uri, comment);
-      this.refresh();
-    }
   }
 
   async updateStatus(uri: vscode.Uri)

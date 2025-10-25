@@ -17,21 +17,6 @@ export interface GitHubRepository
     defaultBranch: string;
 }
 
-export interface GitHubIssue
-{
-    id: number;
-    number: number;
-    title: string;
-    body: string;
-    state: 'open' | 'closed';
-    author: string;
-    labels: string[];
-    assignees: string[];
-    created: Date;
-    updated: Date;
-    url: string;
-}
-
 export interface GitHubUser
 {
     login: string;
@@ -44,20 +29,9 @@ export interface PRReview
 {
     id: number;
     user: string;
-    state: 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED';
+    state: 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED';
     body: string;
     submittedAt: Date;
-}
-
-export interface PRComment
-{
-    id: number;
-    user: string;
-    body: string;
-    path?: string;
-    line?: number;
-    createdAt: Date;
-    updatedAt: Date;
 }
 
 // github api pozivi
@@ -218,7 +192,6 @@ export class GitHubService
                 author: data.user.login,
                 created: new Date(data.created_at),
                 updated: new Date(data.updated_at),
-                reviewStatus: await this.getPRReviewStatus(owner, repo, prNumber),
                 targetBranch: data.base.ref,
                 sourceBranch: data.head.ref
             };
@@ -300,153 +273,6 @@ export class GitHubService
             body: review.body,
             submittedAt: new Date(review.submitted_at)
         }));
-    }
-
-    async getPRReviewStatus(owner: string, repo: string, prNumber: number): Promise<PullRequestInfo['reviewStatus']>
-    {
-        try
-        {
-            const reviews = await this.getPRReviews(owner, repo, prNumber);
-
-            if (reviews.length === 0) return 'pending';
-
-            // Get the latest review from each unique reviewer
-            const latestReviews = new Map<string, PRReview>();
-            reviews.forEach(review =>
-            {
-                const existing = latestReviews.get(review.user);
-                if (!existing || review.submittedAt > existing.submittedAt)
-                {
-                    latestReviews.set(review.user, review);
-                }
-            });
-
-            const states = Array.from(latestReviews.values()).map(r => r.state);
-
-            if (states.includes('CHANGES_REQUESTED')) return 'changes-requested';
-            if (states.every(state => state === 'APPROVED')) return 'approved';
-            return 'pending';
-        } catch (error)
-        {
-            console.error('Error getting PR review status:', error);
-            return 'pending';
-        }
-    }
-
-    // Pull Request Comments
-    async getPRComments(owner: string, repo: string, prNumber: number): Promise<PRComment[]>
-    {
-        const [issueComments, reviewComments] = await Promise.all([
-            this.makeRequest<any[]>(`/repos/${owner}/${repo}/issues/${prNumber}/comments`),
-            this.makeRequest<any[]>(`/repos/${owner}/${repo}/pulls/${prNumber}/comments`)
-        ]);
-
-        const allComments = [
-            ...issueComments.map(comment => ({
-                id: comment.id,
-                user: comment.user.login,
-                body: comment.body,
-                createdAt: new Date(comment.created_at),
-                updatedAt: new Date(comment.updated_at)
-            })),
-            ...reviewComments.map(comment => ({
-                id: comment.id,
-                user: comment.user.login,
-                body: comment.body,
-                path: comment.path,
-                line: comment.line,
-                createdAt: new Date(comment.created_at),
-                updatedAt: new Date(comment.updated_at)
-            }))
-        ];
-
-        return allComments.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-    }
-
-    async addPRComment(owner: string, repo: string, prNumber: number, body: string): Promise<PRComment | null>
-    {
-        try
-        {
-            const data = await this.makeRequest<any>(`/repos/${owner}/${repo}/issues/${prNumber}/comments`, {
-                method: 'POST',
-                body: JSON.stringify({ body })
-            });
-
-            return {
-                id: data.id,
-                user: data.user.login,
-                body: data.body,
-                createdAt: new Date(data.created_at),
-                updatedAt: new Date(data.updated_at)
-            };
-        } catch (error)
-        {
-            console.error('Error adding PR comment:', error);
-            return null;
-        }
-    }
-
-    // Issues
-    async getIssues(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open'): Promise<GitHubIssue[]>
-    {
-        const data = await this.makeRequest<any[]>(`/repos/${owner}/${repo}/issues?state=${state}`);
-
-        return data
-            .filter(issue => !issue.pull_request) // Filter out PRs
-            .map(issue => ({
-                id: issue.id,
-                number: issue.number,
-                title: issue.title,
-                body: issue.body,
-                state: issue.state,
-                author: issue.user.login,
-                labels: issue.labels.map((label: any) => label.name),
-                assignees: issue.assignees.map((assignee: any) => assignee.login),
-                created: new Date(issue.created_at),
-                updated: new Date(issue.updated_at),
-                url: issue.html_url
-            }));
-    }
-
-    async createIssue(
-        owner: string,
-        repo: string,
-        title: string,
-        body: string,
-        labels?: string[],
-        assignees?: string[]
-    ): Promise<GitHubIssue | null>
-    {
-        try
-        {
-            const data = await this.makeRequest<any>(`/repos/${owner}/${repo}/issues`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    title,
-                    body,
-                    labels,
-                    assignees
-                })
-            });
-
-            return {
-                id: data.id,
-                number: data.number,
-                title: data.title,
-                body: data.body,
-                state: data.state,
-                author: data.user.login,
-                labels: data.labels.map((label: any) => label.name),
-                assignees: data.assignees.map((assignee: any) => assignee.login),
-                created: new Date(data.created_at),
-                updated: new Date(data.updated_at),
-                url: data.html_url
-            };
-        } catch (error)
-        {
-            console.error('Error creating issue:', error);
-            return null;
-        }
     }
 
     // User and Team Information

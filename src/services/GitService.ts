@@ -53,7 +53,6 @@ export class GitService
         }
     }
 
-    // sve grane
     async getAllBranches(): Promise<BranchInfo[]>
     {
         try

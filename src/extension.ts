@@ -44,7 +44,6 @@ export function activate(context: vscode.ExtensionContext)
     vscode.commands.registerCommand(DirectoryProviderCommands.SelectItem, (args) => directoryProvider.selectItem(vscode.Uri.parse(args.path))),
     vscode.commands.registerCommand(DirectoryProviderCommands.SelectItemToSection, async (args) =>
     {
-      // pitaj korisnika za sekciju
       const sectionId = await directoryOperator.askUserForSection();
       if (sectionId) 
       {
@@ -73,9 +72,8 @@ export function activate(context: vscode.ExtensionContext)
     }),
     vscode.commands.registerCommand(DirectoryProviderCommands.RemoveAllItems, () => directoryProvider.removeAllItems()),
 
-    // AI i metadata komande
+    // AI + Git + jos neke komande
     vscode.commands.registerCommand(DirectoryProviderCommands.ViewAISummary, (args) => directoryProvider.viewAISummary(args.resourceUri)),
-    vscode.commands.registerCommand(DirectoryProviderCommands.AddBookmarkComment, (args) => directoryProvider.addComment(args.resourceUri)),
     vscode.commands.registerCommand(DirectoryProviderCommands.AddBookmarkTags, (args) => directoryProvider.addTags(args.resourceUri)),
     vscode.commands.registerCommand(DirectoryProviderCommands.ShowGitDiff, (args) => directoryProvider.showGitDiff(args.resourceUri)),
     vscode.commands.registerCommand(DirectoryProviderCommands.CherryPickChanges, (args) => directoryProvider.cherryPickChanges(args.resourceUri)),
@@ -93,7 +91,6 @@ export function activate(context: vscode.ExtensionContext)
     vscode.commands.registerCommand(DirectoryProviderCommands.SyncTeamBookmarks, () => directoryProvider.syncTeamBookmarks()),
     vscode.commands.registerCommand(DirectoryProviderCommands.InjectTeamBookmarks, () => directoryProvider.injectTeamBookmarks()),
 
-    vscode.commands.registerCommand(DirectoryProviderCommands.AddComment, (args) => directoryProvider.addQuickComment(args.resourceUri)),
     vscode.commands.registerCommand(DirectoryProviderCommands.UpdateStatus, (args) => directoryProvider.updateStatus(args.resourceUri)),
     vscode.commands.registerCommand(DirectoryProviderCommands.UpdatePriority, (args) => directoryProvider.updatePriority(args.resourceUri)),
 
